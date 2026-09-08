@@ -1,0 +1,13 @@
+{
+  "name": "Four Rings Performance",
+  "short_name": "Four Rings",
+  "description": "Independent Audi & Volkswagen specialist in Agoura Hills, CA",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#10141a",
+  "theme_color": "#10141a",
+  "icons": [
+    { "src": "assets/images/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/images/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

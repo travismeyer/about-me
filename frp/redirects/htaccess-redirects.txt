@@ -1,0 +1,33 @@
+# ============================================================
+# 301 redirects: old fourringsperformance.com (WordPress) URLs
+# -> new site structure. Paste this block into the site's
+# .htaccess, ABOVE any existing WordPress rewrite rules.
+#
+# Why this matters: search engines have already indexed and
+# ranked the OLD URLs. Without permanent (301) redirects from
+# every old URL to its new equivalent, that ranking history is
+# lost and the new site effectively starts over at zero.
+# ============================================================
+
+RewriteEngine On
+
+Redirect 301 /about/ https://www.fourringsperformance.com/about.html
+Redirect 301 /automotive-services/ https://www.fourringsperformance.com/automotive-services.html
+Redirect 301 /audi-air-conditioning-repairs/ https://www.fourringsperformance.com/services/air-conditioning.html
+Redirect 301 /brake-repair-agoura-hills/ https://www.fourringsperformance.com/services/brakes.html
+Redirect 301 /car-key-programming/ https://www.fourringsperformance.com/services/car-key-programming.html
+Redirect 301 /audi-component-protection/ https://www.fourringsperformance.com/services/component-protection.html
+Redirect 301 /computer-diagnostics-troubleshooting/ https://www.fourringsperformance.com/services/diagnostics.html
+Redirect 301 /audi-electrical-repairs/ https://www.fourringsperformance.com/services/electrical.html
+Redirect 301 /audi-engine-repair/ https://www.fourringsperformance.com/services/engine-repair.html
+Redirect 301 /four-wheel-allignment/ https://www.fourringsperformance.com/services/wheel-alignment.html
+Redirect 301 /oil-change-agoura-hills/ https://www.fourringsperformance.com/services/oil-change.html
+Redirect 301 /radiator-belt-hose-repairs/ https://www.fourringsperformance.com/services/radiator-belts-hoses.html
+Redirect 301 /routine-maintenance/ https://www.fourringsperformance.com/services/routine-maintenance.html
+Redirect 301 /audi-vw-suspension-services/ https://www.fourringsperformance.com/services/suspension.html
+Redirect 301 /timing-belt-chain-replacement/ https://www.fourringsperformance.com/services/timing-belt-chain.html
+Redirect 301 /audi-transmission-repair/ https://www.fourringsperformance.com/services/transmission.html
+Redirect 301 /audi-vw-service-reviews/ https://www.fourringsperformance.com/reviews.html
+Redirect 301 /contact/ https://www.fourringsperformance.com/contact.html
+Redirect 301 /privacy-policy/ https://www.fourringsperformance.com/privacy-policy.html
+Redirect 301 /site-map/ https://www.fourringsperformance.com/site-map.html

@@ -1,0 +1,27 @@
+# ============================================================
+# Same redirect mapping as htaccess-redirects.txt, in the
+# format Netlify and Cloudflare Pages expect. If deploying to
+# either of those, rename this file to "_redirects" and place
+# it in the site's root (same level as index.html).
+# ============================================================
+
+/about/                                  /about.html                              301
+/automotive-services/                    /automotive-services.html                301
+/audi-air-conditioning-repairs/          /services/air-conditioning.html          301
+/brake-repair-agoura-hills/              /services/brakes.html                    301
+/car-key-programming/                    /services/car-key-programming.html       301
+/audi-component-protection/              /services/component-protection.html      301
+/computer-diagnostics-troubleshooting/   /services/diagnostics.html               301
+/audi-electrical-repairs/                /services/electrical.html                301
+/audi-engine-repair/                     /services/engine-repair.html             301
+/four-wheel-allignment/                  /services/wheel-alignment.html           301
+/oil-change-agoura-hills/                /services/oil-change.html                301
+/radiator-belt-hose-repairs/             /services/radiator-belts-hoses.html      301
+/routine-maintenance/                    /services/routine-maintenance.html       301
+/audi-vw-suspension-services/            /services/suspension.html                301
+/timing-belt-chain-replacement/          /services/timing-belt-chain.html         301
+/audi-transmission-repair/               /services/transmission.html              301
+/audi-vw-service-reviews/                /reviews.html                            301
+/contact/                                /contact.html                            301
+/privacy-policy/                         /privacy-policy.html                     301
+/site-map/                               /site-map.html                           301
