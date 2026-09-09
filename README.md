@@ -8,12 +8,22 @@ Static replacement for the Carrd page, built for GitHub Pages. No build step, no
 travis-meyer-site/
 ├── index.html
 └── assets/
-    ├── styles.css
-    ├── script.js
-    └── travis-meyer.jpg
+    └── css/
+        └── styles.css
+    └── icons/
+        ├── App_Store.png
+        ├── Downloads.png
+        ├── Finder.png
+        ├── Keynote.png
+        ├── Mail.png
+        ├── Messages.png
+        ├── Numbers.png
+        ├── Pages.png
+        ├── Safari.png
+        └── Trash.png
+    └── images/
+        └── travis-meyer.jpg
+    └── css/
+        └── script.js
 ```
 
-- `index.html` — page content and structure
-- `assets/styles.css` — design system (colors, type, layout, responsive rules)
-- `assets/script.js` — animated network-node background (canvas)
-- `assets/travis-meyer.jpg` — your profile photo
