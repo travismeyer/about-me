@@ -188,6 +188,17 @@
     });
   }
 
+  function isAnyMenuOpen() {
+    return menuWraps.some(function (w) { return w.classList.contains('open'); });
+  }
+
+  function openMenu(wrap, trigger, dropdown, key) {
+    closeAllMenus();
+    renderDropdown(dropdown, getMenuItems(key, currentApp));
+    wrap.classList.add('open');
+    trigger.setAttribute('aria-expanded', 'true');
+  }
+
   menuWraps.forEach(function (wrap) {
     var trigger = wrap.querySelector('.menubar-trigger');
     var dropdown = wrap.querySelector('.menubar-dropdown');
@@ -199,9 +210,16 @@
       var wasOpen = wrap.classList.contains('open');
       closeAllMenus();
       if (!wasOpen) {
-        renderDropdown(dropdown, getMenuItems(key, currentApp));
-        wrap.classList.add('open');
-        trigger.setAttribute('aria-expanded', 'true');
+        openMenu(wrap, trigger, dropdown, key);
+      }
+    });
+
+    // Once a menu is open (via click), moving the mouse over a sibling
+    // menu switches to it immediately — exactly like real macOS. Hovering
+    // without ever having clicked does nothing.
+    trigger.addEventListener('mouseenter', function () {
+      if (isAnyMenuOpen() && !wrap.classList.contains('open')) {
+        openMenu(wrap, trigger, dropdown, key);
       }
     });
   });
