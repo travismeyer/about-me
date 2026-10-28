@@ -16,8 +16,10 @@
   },
   "backups": {
     "overall": 98,
-    "troubledClients": null,
-    "notes": "2 parked backups for retention are the cause of the 2% drop."
+    "troubledClients": [
+      "Pasadena Jewish Temple"
+    ],
+    "notes": "PJTC - The laptop is at the other location and will not be powered on until Sunday.  They will get it turned on and let them know to keep it powered on moving forward."
   },
   "windows10": {
     "remaining": 62,
