@@ -423,6 +423,8 @@ textarea::placeholder{color:var(--dim)}
           <span class="ico md id-w10"><svg><use href="#g-w10"/></svg></span><span class="si-name">Windows 10</span><span class="si-val" id="si-w10"></span></button>
         <button class="side-item" role="tab" type="button" data-pane="data" aria-selected="false" aria-controls="pane-data">
           <span class="ico md id-data"><svg><use href="#g-data"/></svg></span><span class="si-name">Data &amp; JSON</span><span class="si-val"></span></button>
+        <button class="side-item" role="tab" type="button" data-pane="password" aria-selected="false" aria-controls="pane-password">
+          <span class="ico md id-data"><svg><use href="#g-lock"/></svg></span><span class="si-name">Password</span><span class="si-val"></span></button>
       </nav>
 
       <div class="panes">
@@ -518,9 +520,13 @@ textarea::placeholder{color:var(--dim)}
             <button class="btn danger" type="button" id="btn-reset">Reset to defaults</button>
             <input type="file" id="file-in" class="file-in" accept=".json,application/json">
           </div>
+        </div>
 
+        <!-- Password -->
+        <div class="pane" id="pane-password" role="tabpanel" hidden>
+          <div class="pane-head"><h2>Password</h2><p>The password that unlocks Admin. Forgot it? Use Forgot password on the lock screen to get a reset code by email.</p></div>
           <form id="pw-form">
-            <div class="gtitle">Admin password</div>
+            <div class="gtitle">Change password</div>
             <div class="list">
               <div class="row" id="pw-cur-row"><label for="pw-cur">Current password</label><span class="field"><input id="pw-cur" class="w-text" type="password" autocomplete="current-password" placeholder="Required"></span></div>
               <div class="row"><label for="pw-new">New password</label><span class="field"><input id="pw-new" class="w-text" type="password" autocomplete="new-password" minlength="8" required placeholder="Required"></span></div>
@@ -897,10 +903,10 @@ textarea::placeholder{color:var(--dim)}
       }
       reset = null; resetting = true;
       markUnlocked(); gateMsg(""); setCodeMode(false);
-      gate(); fillAdmin(); showPane("data");
+      gate(); fillAdmin(); showPane("password");
       $("#pw-cur-row").hidden = true;
       $("#pw-msg").textContent = "Code accepted. Choose a new password."; $("#pw-msg").style.color = "";
-      $("#pw-form").scrollIntoView({ block: "center" }); $("#pw-new").focus();
+      $("#pw-new").focus();
       return;
     }
     if (await hashOf(raw) !== currentHash()){ gateMsg("That password is not right."); pw.focus(); return; }
@@ -958,8 +964,9 @@ textarea::placeholder{color:var(--dim)}
   });
 
   /* Sidebar sections */
+  const PANES = ["patch", "backup", "w10", "data", "password"];
   let pane = "patch";
-  try { const saved = localStorage.getItem("adminPane"); if (["patch", "backup", "w10", "data"].includes(saved)) pane = saved; } catch(e){}
+  try { const saved = localStorage.getItem("adminPane"); if (PANES.includes(saved)) pane = saved; } catch(e){}
   function showPane(name, focus){
     pane = name;
     $$(".side-item").forEach(b => {
@@ -967,8 +974,10 @@ textarea::placeholder{color:var(--dim)}
       b.setAttribute("aria-selected", on);
       b.tabIndex = on ? 0 : -1;
       if (on && focus) b.focus();
+      if (on) b.scrollIntoView({ block: "nearest", inline: "nearest" });
     });
     $$(".pane").forEach(p => { p.hidden = p.id !== "pane-" + name; });
+    $(".actions").hidden = name === "password";
     try { localStorage.setItem("adminPane", name); } catch(e){}
   }
   $$(".side-item").forEach(b => b.addEventListener("click", () => showPane(b.dataset.pane)));
@@ -976,8 +985,7 @@ textarea::placeholder{color:var(--dim)}
     const keys = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
     if (!(e.key in keys)) return;
     e.preventDefault();
-    const order = ["patch", "backup", "w10", "data"];
-    showPane(order[(order.indexOf(pane) + keys[e.key] + order.length) % order.length], true);
+    showPane(PANES[(PANES.indexOf(pane) + keys[e.key] + PANES.length) % PANES.length], true);
   });
 
   /* Unsaved edits: mark the section, keep the calculated rows live */
@@ -1056,10 +1064,10 @@ textarea::placeholder{color:var(--dim)}
     $("#tab-board").setAttribute("aria-selected", isBoard);
     $("#tab-admin").setAttribute("aria-selected", !isBoard);
     movePill(isBoard ? $("#tab-board") : $("#tab-admin"));
-    if (isBoard) setLock(true); else { fillAdmin(); showPane(pane); gate(!instant); }
     const incoming = isBoard ? $("#board") : $("#admin");
     $("#board").hidden = !isBoard;
     $("#admin").hidden = isBoard;
+    if (isBoard) setLock(true); else { fillAdmin(); showPane(pane); gate(!instant); }
     try { localStorage.setItem("tab", which); } catch(e){}
     if (isBoard) placeGlints();
     if (instant) return;
