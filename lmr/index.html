@@ -232,6 +232,8 @@ h1{font-family:var(--display);font-weight:700;font-size:clamp(20px,3vw,26px);lin
 
 .gtitle{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--muted);margin:22px 0 8px 4px}
 .gfoot{font-size:12px;color:var(--dim);margin:7px 4px 0;line-height:1.4}
+.steps{margin:0;padding:0 4px 0 22px;font-size:13.5px;color:var(--muted);line-height:1.7}
+.steps a{color:var(--blue)} .steps b{color:var(--ink);font-weight:600}
 .admin .list{background:rgba(255,255,255,.06)}
 .admin .list > *{background:rgba(14,17,28,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 .row label,.row .k{color:var(--ink);flex:1;min-width:0}
@@ -293,6 +295,7 @@ textarea::placeholder{color:var(--dim)}
   <symbol id="g-data" viewBox="0 0 24 24"><path d="M8.5 5.5c-2 0-2.5 1-2.5 2.5v2.5c0 1-.6 1.5-1.5 1.5.9 0 1.5.5 1.5 1.5V16c0 1.5.5 2.5 2.5 2.5M15.5 5.5c2 0 2.5 1 2.5 2.5v2.5c0 1 .6 1.5 1.5 1.5-.9 0-1.5.5-1.5 1.5V16c0 1.5-.5 2.5-2.5 2.5"/></symbol>
   <symbol id="g-lock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
   <symbol id="g-unlock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 7.6-1.7"/></symbol>
+  <symbol id="g-sync" viewBox="0 0 24 24"><path d="M19 10.5A7.2 7.2 0 0 0 6.2 7.2L4.5 9"/><path d="M4.5 4.8V9h4.2"/><path d="M5 13.5a7.2 7.2 0 0 0 12.8 3.3l1.7-1.8"/><path d="M19.5 19.2V15h-4.2"/></symbol>
 </svg>
 
 <div class="sky" aria-hidden="true"><i></i><i></i></div>
@@ -425,6 +428,8 @@ textarea::placeholder{color:var(--dim)}
           <span class="ico md id-data"><svg><use href="#g-data"/></svg></span><span class="si-name">Data &amp; JSON</span><span class="si-val"></span></button>
         <button class="side-item" role="tab" type="button" data-pane="password" aria-selected="false" aria-controls="pane-password">
           <span class="ico md id-data"><svg><use href="#g-lock"/></svg></span><span class="si-name">Password</span><span class="si-val"></span></button>
+        <button class="side-item" role="tab" type="button" data-pane="sync" aria-selected="false" aria-controls="pane-sync">
+          <span class="ico md id-data"><svg><use href="#g-sync"/></svg></span><span class="si-name">Sync</span><span class="si-val"></span></button>
       </nav>
 
       <div class="panes">
@@ -532,13 +537,36 @@ textarea::placeholder{color:var(--dim)}
               <div class="row"><label for="pw-new">New password</label><span class="field"><input id="pw-new" class="w-text" type="password" autocomplete="new-password" minlength="8" required placeholder="Required"></span></div>
               <div class="row"><label for="pw-new2">Confirm new password</label><span class="field"><input id="pw-new2" class="w-text" type="password" autocomplete="new-password" minlength="8" required placeholder="Required"></span></div>
             </div>
-            <p class="gfoot" id="pw-msg" role="status">At least 8 characters. Applies to this browser.</p>
+            <p class="gfoot" id="pw-msg" role="status">At least 8 characters. With a GitHub token set under Sync, the change applies on every device.</p>
             <div class="btnrow"><button class="btn" type="submit">Change password</button></div>
           </form>
         </div>
 
+        <!-- Sync -->
+        <div class="pane" id="pane-sync" role="tabpanel" hidden>
+          <div class="pane-head"><h2>Sync</h2><p>Saves go to this site's GitHub repo, so every device shows the same numbers. Each device you edit from needs a GitHub token once. Viewing the Board needs nothing.</p></div>
+          <form id="tok-form">
+            <div class="gtitle">GitHub token</div>
+            <div class="list">
+              <div class="row"><label for="tok">Token</label><span class="field"><input id="tok" class="w-text" type="password" autocomplete="off" spellcheck="false"></span></div>
+            </div>
+            <p class="gfoot" id="tok-msg" role="status"></p>
+            <div class="btnrow">
+              <button class="btn primary" type="submit">Save token</button>
+              <button class="btn danger" type="button" id="tok-clear">Remove token</button>
+            </div>
+          </form>
+          <div class="gtitle">Getting a token</div>
+          <ol class="steps">
+            <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → New fine-grained token</a>.</li>
+            <li>Repository access: <b>Only select repositories</b> → <b>about-me</b>.</li>
+            <li>Permissions → Repository → <b>Contents: Read and write</b>.</li>
+            <li>Generate the token, copy it, and paste it above.</li>
+          </ol>
+        </div>
+
         <div class="actions">
-          <span class="msg" id="msg" role="status">Saved data stays in this browser on this computer. Use Export JSON file to move it elsewhere.</span>
+          <span class="msg" id="msg" role="status">Save to board updates every device. Without a GitHub token, saves stay on this device.</span>
           <div class="btnrow">
             <button class="btn" type="button" id="btn-revert">Discard edits</button>
             <button class="btn primary" type="button" id="btn-save">Save to board</button>
@@ -834,16 +862,83 @@ textarea::placeholder{color:var(--dim)}
 
   function setMsg(t, cls){ const m = $("#msg"); m.textContent = t; m.className = "msg " + (cls || ""); }
 
-  function save(obj, okMsg){
+  /* ---------- GitHub sync ----------
+     The repo's lmr/data.json (dashboard) and lmr/admin.json (password hash) are the shared copy.
+     Viewers read the published files; devices with a token read and write through the GitHub API. */
+  const GH_API = "https://api.github.com/repos/travismeyer/about-me/contents/lmr/";
+  const DATA_FILE = "data.json", AUTH_FILE = "admin.json";
+  const ghToken = () => { try { return localStorage.getItem("ghToken") || ""; } catch(e){ return ""; } };
+  const ghHeaders = () => ({ Accept: "application/vnd.github+json", Authorization: "Bearer " + ghToken(), "X-GitHub-Api-Version": "2022-11-28" });
+  const b64 = s => btoa(String.fromCharCode(...new TextEncoder().encode(s)));
+  const unb64 = s => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s/g, "")), c => c.charCodeAt(0)));
+  async function ghErr(r){
+    if (r.status === 401) return "the GitHub token is invalid or expired";
+    if (r.status === 403 || r.status === 404) return "the GitHub token can't write to this repo";
+    const j = await r.json().catch(() => ({}));
+    return j.message || "GitHub returned " + r.status;
+  }
+  // null when the file doesn't exist yet
+  async function ghRead(file){
+    const tok = ghToken();
+    const r = tok
+      ? await fetch(GH_API + file + "?ref=main", { headers: ghHeaders(), cache: "no-store" })
+      : await fetch(file + "?t=" + Date.now(), { cache: "no-store" });
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error(await ghErr(r));
+    return tok ? JSON.parse(unb64((await r.json()).content)) : r.json();
+  }
+  async function ghWrite(file, obj, message){
+    const cur = await fetch(GH_API + file + "?ref=main", { headers: ghHeaders(), cache: "no-store" });
+    if (!cur.ok && cur.status !== 404) throw new Error(await ghErr(cur));
+    const sha = cur.ok ? (await cur.json()).sha : undefined;
+    const r = await fetch(GH_API + file, {
+      method: "PUT",
+      headers: { ...ghHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ message, branch: "main", sha, content: b64(JSON.stringify(obj, null, 2) + "\n") })
+    });
+    if (!r.ok) throw new Error(await ghErr(r));
+  }
+  function syncNote(t, cls){ const m = $("#tok-msg"); m.textContent = t; m.style.color = cls ? `var(--${cls})` : ""; }
+  let pulling = false;
+  async function pull(){
+    if (pulling) return;
+    pulling = true;
+    try {
+      const [d, a] = await Promise.all([ghRead(DATA_FILE), ghRead(AUTH_FILE)]);
+      if (a && a.passwordHash) try { localStorage.setItem("adminHash", a.passwordHash); } catch(e){}
+      if (isObj(d) && !saving){
+        data = d; storeData(d); render();
+        if (view === "admin" && !$(".side-item.dirty") && !$("#admin").contains(document.activeElement)) fillAdmin();
+      }
+      if (ghToken()) syncNote("Synced with GitHub at " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + ".", "good");
+    } catch(err){
+      syncNote("Could not load from GitHub: " + err.message + ". Showing this device's copy.", "crit");
+    } finally {
+      pulling = false;
+    }
+  }
+
+  async function save(obj, okMsg){
     if (saving) return;
     saving = true;
     const g = guardTarget(obj);
     data = clone(g.obj);
-    const stored = storeData(data);
+    storeData(data);
     fillAdmin();
     render();
-    if (stored) setMsg((okMsg || "Saved. The board is updated.") + (g.kept ? ` The target is locked, so it stayed at ${g.obj.patching.targetPercentage}%.` : ""), "ok");
-    else setMsg("Board updated, but this browser blocked saving. Export JSON to keep your changes.", "err");
+    const kept = g.kept ? ` The target is locked, so it stayed at ${g.obj.patching.targetPercentage}%.` : "";
+    if (!ghToken()){
+      setMsg("Saved on this device only. Add a GitHub token under Sync to update your other devices." + kept, "err");
+      saving = false;
+      return;
+    }
+    setMsg("Saving to GitHub…", "edit");
+    try {
+      await ghWrite(DATA_FILE, data, "Update dashboard data");
+      setMsg((okMsg || "Saved. Every device will show this.") + kept, "ok");
+    } catch(err){
+      setMsg("Saved on this device, but not to GitHub: " + err.message + ".", "err");
+    }
     saving = false;
   }
 
@@ -954,17 +1049,47 @@ textarea::placeholder{color:var(--dim)}
     if (!resetting && await hashOf(cur.value) !== currentHash()) return fail("The current password is not right.", cur);
     if (a.value.length < 8) return fail("Use at least 8 characters.", a);
     if (a.value !== b.value) return fail("The new passwords do not match.", b);
-    try { localStorage.setItem("adminHash", await hashOf(a.value)); }
+    const h = await hashOf(a.value);
+    if (ghToken()){
+      m.textContent = "Saving to GitHub…"; m.style.color = "";
+      try { await ghWrite(AUTH_FILE, { passwordHash: h }, "Change admin password"); }
+      catch(err){ return fail("Password not changed: " + err.message + ".", a); }
+    }
+    try { localStorage.setItem("adminHash", h); }
     catch(err){ return fail("This browser blocked saving the new password.", a); }
     markUnlocked();
     resetting = false;
     cur.value = a.value = b.value = "";
     $("#pw-cur-row").hidden = false;
-    m.textContent = "Password changed for this browser."; m.style.color = "var(--good)";
+    m.textContent = ghToken() ? "Password changed on every device." : "Password changed on this device only. Add a GitHub token under Sync to change it everywhere.";
+    m.style.color = ghToken() ? "var(--good)" : "var(--warn)";
+  });
+
+  function fillSync(){ $("#tok").value = ""; $("#tok").placeholder = ghToken() ? "Saved on this device" : "Not set"; $("#tok-clear").hidden = !ghToken(); }
+  $("#tok-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const t = $("#tok").value.trim();
+    if (!t){ syncNote("Paste a token first.", "crit"); $("#tok").focus(); return; }
+    const prev = ghToken();
+    try { localStorage.setItem("ghToken", t); } catch(err){ syncNote("This browser blocked saving the token.", "crit"); return; }
+    syncNote("Checking the token…");
+    const r = await fetch(GH_API + DATA_FILE + "?ref=main", { headers: ghHeaders(), cache: "no-store" }).catch(() => null);
+    if (!r || (!r.ok && r.status !== 404)){
+      try { prev ? localStorage.setItem("ghToken", prev) : localStorage.removeItem("ghToken"); } catch(err){}
+      syncNote(r ? "Token not saved: " + await ghErr(r) + "." : "Token not saved: could not reach GitHub.", "crit");
+      return;
+    }
+    fillSync();
+    syncNote("Token saved. Saves from this device now update every device.", "good");
+  });
+  $("#tok-clear").addEventListener("click", () => {
+    try { localStorage.removeItem("ghToken"); } catch(e){}
+    fillSync();
+    syncNote("Token removed. Saves from this device stay on this device.");
   });
 
   /* Sidebar sections */
-  const PANES = ["patch", "backup", "w10", "data", "password"];
+  const PANES = ["patch", "backup", "w10", "data", "password", "sync"];
   let pane = "patch";
   try { const saved = localStorage.getItem("adminPane"); if (PANES.includes(saved)) pane = saved; } catch(e){}
   function showPane(name, focus){
@@ -977,7 +1102,7 @@ textarea::placeholder{color:var(--dim)}
       if (on) b.scrollIntoView({ block: "nearest", inline: "nearest" });
     });
     $$(".pane").forEach(p => { p.hidden = p.id !== "pane-" + name; });
-    $(".actions").hidden = name === "password";
+    $(".actions").hidden = name === "password" || name === "sync";
     try { localStorage.setItem("adminPane", name); } catch(e){}
   }
   $$(".side-item").forEach(b => b.addEventListener("click", () => showPane(b.dataset.pane)));
@@ -1116,9 +1241,14 @@ textarea::placeholder{color:var(--dim)}
     if (view === "admin" && !$("#admin").contains(document.activeElement)) fillAdmin();
   });
 
+  /* Back to the tab later: fetch what other devices saved */
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) pull(); });
+
   /* ---------- Boot ---------- */
   fillAdmin();
+  fillSync();
   show("board", true);
+  pull();
   // Let the glass settle in first, then bring the data to life.
   setTimeout(render, reduced ? 0 : 320);
   setTimeout(() => document.body.classList.add("settled"), 1200);
