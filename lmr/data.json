@@ -5,14 +5,14 @@
     "servers": 97,
     "workstations": 91,
     "jobs": {
-      "pending": 162,
+      "pending": 163,
       "running": 12,
       "daytime": 233
     },
     "notes": [
       "Patches are still being pushed out from yesterdays patching or have pending reboots so they can complete."
     ],
-    "lastUpdated": "10/28/26 11:18am"
+    "lastUpdated": "10/28/26 12:12pm"
   },
   "backups": {
     "overall": 97,
