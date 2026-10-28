@@ -210,6 +210,14 @@ h1{font-family:var(--display);font-weight:700;font-size:clamp(20px,3vw,26px);lin
   .si-val{display:none}
 }
 
+.gate{max-width:360px;margin:8vh auto 0;display:grid;justify-items:center;gap:12px;text-align:center;animation:paneIn .28s cubic-bezier(.2,.8,.2,1)}
+.gate h2{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:-.018em;margin:0}
+.gate p{margin:0;font-size:13.5px;color:var(--muted)}
+.gate input{width:100%;font-size:16px;padding:10px 14px;border-radius:12px;border:1px solid var(--stroke);background:rgba(118,118,128,.18);color:var(--ink)}
+.gate .btn{width:100%;padding:10px 16px}
+.gate .msg{min-height:1.4em;flex:none}
+.link{border:0;background:none;color:var(--blue);font-size:13px;font-weight:600;padding:4px 8px;cursor:pointer}
+.link:disabled{color:var(--dim);cursor:default}
 .pane{animation:paneIn .28s cubic-bezier(.2,.8,.2,1)}
 @keyframes paneIn{from{opacity:0;transform:translateY(6px)}}
 .pane-head{margin:2px 0 4px}
@@ -234,6 +242,7 @@ h1{font-family:var(--display);font-weight:700;font-size:clamp(20px,3vw,26px);lin
 .field{display:flex;align-items:center;gap:3px;color:var(--muted);flex:none}
 .field input{width:6ch;border:0;background:transparent;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums;font-weight:600;padding:2px 0;outline:none}
 .field input.w-text{width:min(18ch,40vw)}
+.field input::placeholder{color:var(--dim);font-weight:400}
 .field input[type=date]{width:auto}
 .field input[readonly]{color:var(--dim);cursor:not-allowed}
 .field .unit{width:1.1em;text-align:left}
@@ -395,6 +404,15 @@ textarea::placeholder{color:var(--dim)}
   </main>
 
   <section id="admin" class="admin" role="tabpanel" aria-labelledby="tab-admin" hidden>
+    <form class="panel gate" id="gate" hidden>
+      <span class="ico md id-data"><svg><use href="#g-lock"/></svg></span>
+      <h2>Admin is locked</h2>
+      <p id="gate-p">Enter the admin password to edit the board.</p>
+      <input id="gate-pw" type="password" autocomplete="current-password" aria-label="Admin password" aria-describedby="gate-msg" required>
+      <button class="btn primary" type="submit" id="gate-go">Unlock</button>
+      <button class="link" type="button" id="gate-forgot">Forgot password?</button>
+      <p class="msg err" id="gate-msg" role="alert"></p>
+    </form>
     <div class="admin-shell">
       <nav class="panel side" role="tablist" aria-label="Admin sections" aria-orientation="vertical" id="side">
         <button class="side-item" role="tab" type="button" data-pane="patch" aria-selected="true" aria-controls="pane-patch">
@@ -500,6 +518,17 @@ textarea::placeholder{color:var(--dim)}
             <button class="btn danger" type="button" id="btn-reset">Reset to defaults</button>
             <input type="file" id="file-in" class="file-in" accept=".json,application/json">
           </div>
+
+          <form id="pw-form">
+            <div class="gtitle">Admin password</div>
+            <div class="list">
+              <div class="row" id="pw-cur-row"><label for="pw-cur">Current password</label><span class="field"><input id="pw-cur" class="w-text" type="password" autocomplete="current-password" placeholder="Required"></span></div>
+              <div class="row"><label for="pw-new">New password</label><span class="field"><input id="pw-new" class="w-text" type="password" autocomplete="new-password" minlength="8" required placeholder="Required"></span></div>
+              <div class="row"><label for="pw-new2">Confirm new password</label><span class="field"><input id="pw-new2" class="w-text" type="password" autocomplete="new-password" minlength="8" required placeholder="Required"></span></div>
+            </div>
+            <p class="gfoot" id="pw-msg" role="status">At least 8 characters. Applies to this browser.</p>
+            <div class="btnrow"><button class="btn" type="submit">Change password</button></div>
+          </form>
         </div>
 
         <div class="actions">
@@ -819,6 +848,115 @@ textarea::placeholder{color:var(--dim)}
   }
   const isObj = o => o && typeof o === "object" && !Array.isArray(o);
 
+  /* Password gate. ponytail: client-side only (static site), so it stops casual visitors, not someone with devtools.
+     Edits only ever touch the visitor's own localStorage. Default password: printf %s 'new' | shasum -a 256
+     A password changed in Admin is stored per browser (localStorage) and overrides the default there. */
+  const ADMIN_HASH = "15ab6c350a52858970e99bb798b847b687061886a861ae8217481d3ea16cf6d7";
+  // Web3Forms access key: emails go to the address the key was created with (web3forms.com). Empty = reset off.
+  const RESET_KEY = "a459f392-e1bc-4e73-9a8f-cf53bbc7014c";
+  const RESET_TTL = 15 * 60 * 1000, RESET_TRIES = 5, RESET_COOLDOWN = 60 * 1000;
+
+  const hashOf = async s => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))]
+    .map(b => b.toString(16).padStart(2, "0")).join("");
+  const currentHash = () => { try { return localStorage.getItem("adminHash") || ADMIN_HASH; } catch(e){ return ADMIN_HASH; } };
+  function markUnlocked(){ unlocked = true; try { sessionStorage.setItem("adminUnlocked", currentHash()); } catch(e){} }
+
+  let unlocked = false, codeMode = false, reset = null, lastSent = 0, resetting = false;
+  try { unlocked = sessionStorage.getItem("adminUnlocked") === currentHash(); } catch(e){}
+
+  function gate(focus){
+    $("#gate").hidden = unlocked;
+    $(".admin-shell").hidden = !unlocked;
+    if (!unlocked && focus) $("#gate-pw").focus();
+  }
+  function gateMsg(t, cls){ const m = $("#gate-msg"); m.textContent = t; m.className = "msg " + (cls || "err"); }
+  function setCodeMode(on){
+    codeMode = on;
+    const pw = $("#gate-pw");
+    pw.value = "";
+    pw.type = on ? "text" : "password";
+    pw.inputMode = on ? "numeric" : "";
+    pw.autocomplete = on ? "one-time-code" : "current-password";
+    pw.maxLength = on ? 6 : 524288;
+    pw.setAttribute("aria-label", on ? "Reset code" : "Admin password");
+    $("#gate-p").textContent = on ? "Enter the 6-digit code from the reset email." : "Enter the admin password to edit the board.";
+    $("#gate-go").textContent = on ? "Verify code" : "Unlock";
+    $("#gate-forgot").textContent = on ? "Use password instead" : "Forgot password?";
+    pw.focus();
+  }
+
+  $("#gate").addEventListener("submit", async e => {
+    e.preventDefault();
+    const pw = $("#gate-pw"), raw = pw.value, entry = raw.trim();
+    pw.value = "";
+    if (codeMode){
+      if (!reset || Date.now() > reset.expires){ reset = null; gateMsg("That code has expired. Request a new one."); setCodeMode(false); return; }
+      if (await hashOf(entry) !== reset.hash){
+        if (--reset.tries <= 0){ reset = null; gateMsg("Too many wrong codes. Request a new one."); setCodeMode(false); return; }
+        gateMsg("That code is not right."); pw.focus(); return;
+      }
+      reset = null; resetting = true;
+      markUnlocked(); gateMsg(""); setCodeMode(false);
+      gate(); fillAdmin(); showPane("data");
+      $("#pw-cur-row").hidden = true;
+      $("#pw-msg").textContent = "Code accepted. Choose a new password."; $("#pw-msg").style.color = "";
+      $("#pw-form").scrollIntoView({ block: "center" }); $("#pw-new").focus();
+      return;
+    }
+    if (await hashOf(raw) !== currentHash()){ gateMsg("That password is not right."); pw.focus(); return; }
+    markUnlocked(); gateMsg("");
+    gate();
+    fillAdmin(); showPane(pane, true);
+  });
+
+  $("#gate-forgot").addEventListener("click", async () => {
+    if (codeMode){ gateMsg(""); setCodeMode(false); return; }
+    if (!RESET_KEY){ gateMsg("Password reset by email is not set up yet."); return; }
+    if (reset && Date.now() < reset.expires){ gateMsg("Enter the code from the email already sent.", "edit"); setCodeMode(true); return; }
+    if (Date.now() - lastSent < RESET_COOLDOWN){ gateMsg("A code was just sent. Wait a minute before asking again."); return; }
+    const btn = $("#gate-forgot");
+    btn.disabled = true; gateMsg("Sending a reset code…", "edit");
+    const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1e6).padStart(6, "0");
+    try {
+      const r = await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          access_key: RESET_KEY,
+          subject: "Patch & Backup Health: admin reset code",
+          from_name: "Patch & Backup Health",
+          message: `Your admin reset code is ${code}. It expires in 15 minutes.\n\nIf you did not ask for this, ignore this email.`
+        })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.success) throw new Error(j.message || "HTTP " + r.status);
+      reset = { hash: await hashOf(code), expires: Date.now() + RESET_TTL, tries: RESET_TRIES };
+      lastSent = Date.now();
+      gateMsg("A reset code was emailed to the admin address.", "ok");
+      setCodeMode(true);
+    } catch(err){
+      gateMsg("Could not send the reset email: " + err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $("#pw-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const m = $("#pw-msg"), cur = $("#pw-cur"), a = $("#pw-new"), b = $("#pw-new2");
+    const fail = (t, el) => { m.textContent = t; m.style.color = "var(--crit)"; el.focus(); };
+    if (!resetting && await hashOf(cur.value) !== currentHash()) return fail("The current password is not right.", cur);
+    if (a.value.length < 8) return fail("Use at least 8 characters.", a);
+    if (a.value !== b.value) return fail("The new passwords do not match.", b);
+    try { localStorage.setItem("adminHash", await hashOf(a.value)); }
+    catch(err){ return fail("This browser blocked saving the new password.", a); }
+    markUnlocked();
+    resetting = false;
+    cur.value = a.value = b.value = "";
+    $("#pw-cur-row").hidden = false;
+    m.textContent = "Password changed for this browser."; m.style.color = "var(--good)";
+  });
+
   /* Sidebar sections */
   let pane = "patch";
   try { const saved = localStorage.getItem("adminPane"); if (["patch", "backup", "w10", "data"].includes(saved)) pane = saved; } catch(e){}
@@ -845,7 +983,7 @@ textarea::placeholder{color:var(--dim)}
   /* Unsaved edits: mark the section, keep the calculated rows live */
   $("#admin").addEventListener("input", e => {
     const p = e.target.closest(".pane");
-    if (!p) return;
+    if (!p || e.target.closest("#pw-form")) return;
     $(`.side-item[data-pane="${p.id.slice(5)}"]`).classList.add("dirty");
     setMsg("Unsaved changes. Choose Save to board to apply them.", "edit");
     derived();
@@ -918,7 +1056,7 @@ textarea::placeholder{color:var(--dim)}
     $("#tab-board").setAttribute("aria-selected", isBoard);
     $("#tab-admin").setAttribute("aria-selected", !isBoard);
     movePill(isBoard ? $("#tab-board") : $("#tab-admin"));
-    if (isBoard) setLock(true); else { fillAdmin(); showPane(pane); }
+    if (isBoard) setLock(true); else { fillAdmin(); showPane(pane); gate(!instant); }
     const incoming = isBoard ? $("#board") : $("#admin");
     $("#board").hidden = !isBoard;
     $("#admin").hidden = isBoard;
