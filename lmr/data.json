@@ -1,0 +1,27 @@
+{
+  "patching": {
+    "targetPercentage": 95,
+    "overall": 100,
+    "servers": 100,
+    "workstations": 99,
+    "jobs": {
+      "pending": 1,
+      "running": 1,
+      "daytime": 4
+    },
+    "notes": [
+      "Patches are still being pushed out or have pending reboots so they can complete."
+    ],
+    "lastUpdated": "10/27/26 6:19pm"
+  },
+  "backups": {
+    "overall": 98,
+    "troubledClients": null,
+    "notes": "2 parked backups for retention are the cause of the 2% drop."
+  },
+  "windows10": {
+    "remaining": 59,
+    "lastMonth": 60,
+    "eolDate": "2025-10-14"
+  }
+}
