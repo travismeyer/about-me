@@ -3,10 +3,10 @@
     "targetPercentage": 95,
     "overall": 92,
     "servers": 97,
-    "workstations": 90,
+    "workstations": 91,
     "jobs": {
-      "pending": 161,
-      "running": 13,
+      "pending": 162,
+      "running": 12,
       "daytime": 233
     },
     "notes": [
