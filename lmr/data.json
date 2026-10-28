@@ -1,18 +1,18 @@
 {
   "patching": {
     "targetPercentage": 95,
-    "overall": 100,
-    "servers": 100,
-    "workstations": 99,
+    "overall": 92,
+    "servers": 97,
+    "workstations": 90,
     "jobs": {
-      "pending": 1,
-      "running": 1,
-      "daytime": 4
+      "pending": 161,
+      "running": 13,
+      "daytime": 233
     },
     "notes": [
-      "Patches are still being pushed out or have pending reboots so they can complete."
+      "Patches are still being pushed out from yesterdays patching or have pending reboots so they can complete."
     ],
-    "lastUpdated": "10/27/26 6:19pm"
+    "lastUpdated": "10/28/26 11:18am"
   },
   "backups": {
     "overall": 98,
