@@ -1068,7 +1068,6 @@ textarea::placeholder{color:var(--dim)}
     $("#board").hidden = !isBoard;
     $("#admin").hidden = isBoard;
     if (isBoard) setLock(true); else { fillAdmin(); showPane(pane); gate(!instant); }
-    try { localStorage.setItem("tab", which); } catch(e){}
     if (isBoard) placeGlints();
     if (instant) return;
     const start = isBoard ? -28 : 28;
@@ -1119,8 +1118,7 @@ textarea::placeholder{color:var(--dim)}
 
   /* ---------- Boot ---------- */
   fillAdmin();
-  let lastTab = null; try { lastTab = localStorage.getItem("tab"); } catch(e){}
-  show(lastTab === "admin" ? "admin" : "board", true);
+  show("board", true);
   // Let the glass settle in first, then bring the data to life.
   setTimeout(render, reduced ? 0 : 320);
   setTimeout(() => document.body.classList.add("settled"), 1200);
