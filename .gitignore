@@ -6,3 +6,7 @@
 
 # GSL files
 *.gsl
+
+# Generated locally
+graphify-out/
+.playwright-mcp/
