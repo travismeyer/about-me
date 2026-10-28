@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Patch &amp; Backup Health</title>
+<!-- Favicon: Twemoji shield (CC-BY 4.0), loaded from jsDelivr so the site stays a single file -->
+<link rel="icon" type="image/svg+xml" href="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f6e1.svg">
+<link rel="icon" type="image/png" sizes="72x72" href="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/72x72/1f6e1.png">
+<link rel="apple-touch-icon" href="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/72x72/1f6e1.png">
+<style>
+/* Layout: sticky glass header + segmented control, KPI strip, full-width Patching hero row,
+   Backups + Windows 10 side by side. Admin is a System Settings two-pane: sidebar + two-column sections.
+   Committed dark world: black falling to deep blue, with two slow counter-drifting light layers behind the glass.
+   Color rule: identity hue lives only on icon tiles; every data mark takes its status tone. */
+:root{
+  --bg:#000000;
+  --deep:#061a44;
+  --surface:rgba(20,24,36,.58);
+  --surface-strong:rgba(44,48,60,.92);
+  --row:rgba(8,11,20,.72);
+  --stroke:rgba(255,255,255,.09);
+  --stroke-soft:rgba(255,255,255,.05);
+  --ink:#f5f5f7;
+  --muted:#9a9cab;
+  --dim:#6c6f80;
+  /* identity */
+  --patch:#22d3ff; --backup:#a970ff; --w10:#ff3fa4;
+  /* status */
+  --good:#39ff88; --warn:#ff9426; --crit:#ff4d5e; --blue:#3d8bff;
+  --display:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,"Segoe UI",sans-serif;
+  --body:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,"Segoe UI",sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.47;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+
+/* ---------- Background ---------- */
+body::before{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;background:linear-gradient(180deg,#000 0%,#01040d 30%,#031030 65%,var(--deep) 100%)}
+.sky{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden;
+  -webkit-mask-image:linear-gradient(180deg,transparent 0%,#000 40%);mask-image:linear-gradient(180deg,transparent 0%,#000 40%)}
+.sky i{position:absolute;inset:-30%;will-change:transform}
+.sky i:nth-child(1){background:
+    radial-gradient(30% 26% at 25% 74%,rgba(37,99,235,.34),transparent 70%),
+    radial-gradient(26% 22% at 72% 90%,rgba(29,78,216,.30),transparent 70%);
+  animation:flowA 24s ease-in-out infinite alternate}
+.sky i:nth-child(2){background:
+    radial-gradient(22% 18% at 78% 62%,rgba(56,189,248,.13),transparent 70%),
+    radial-gradient(26% 22% at 38% 58%,rgba(61,139,255,.12),transparent 70%);
+  animation:flowB 32s ease-in-out infinite alternate}
+@keyframes flowA{from{transform:translate3d(-8%,4%,0) rotate(-4deg)}to{transform:translate3d(8%,-5%,0) rotate(4deg) scale(1.1)}}
+@keyframes flowB{from{transform:translate3d(7%,-3%,0) scale(1.05)}to{transform:translate3d(-7%,5%,0) scale(.95)}}
+
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 64px}
+button,input,textarea{font:inherit}
+:focus-visible{outline:2px solid var(--blue);outline-offset:3px;border-radius:8px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* tones */
+.t-good{--tone:var(--good)} .t-warn{--tone:var(--warn)} .t-crit{--tone:var(--crit)} .t-blue{--tone:var(--blue)} .t-info{--tone:var(--muted)}
+
+/* identity icon tiles (Settings-style) */
+.ico{--s:26px;width:var(--s);height:var(--s);border-radius:calc(var(--s) * .27);display:inline-grid;place-items:center;flex:none;
+  background:linear-gradient(180deg,var(--id),color-mix(in srgb,var(--id) 68%,#000));box-shadow:0 1px 0 rgba(255,255,255,.25) inset}
+.ico svg{width:58%;height:58%;fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.ico.sm{--s:20px}
+.ico.md{--s:24px}
+.id-patch{--id:var(--patch)} .id-backup{--id:var(--backup)} .id-w10{--id:var(--w10)} .id-data{--id:#8e8e93}
+
+/* numbers: numeral and % share the tone; % is set smaller; glow follows the tone */
+.num{font-family:var(--display);font-weight:700;letter-spacing:-.025em;color:var(--tone,var(--ink));font-variant-numeric:tabular-nums;line-height:1;transition:color .35s;
+  filter:drop-shadow(0 0 10px color-mix(in srgb,var(--tone,transparent) 42%,transparent))}
+.num i{font-style:normal;font-size:.56em;font-weight:600;letter-spacing:0;margin-left:.03em}
+.num small{font-family:var(--body);font-size:13px;font-weight:500;letter-spacing:0;color:var(--muted);margin-left:5px}
+/* digit reels: each digit rolls on its own column, faded at the edges like numeric text transitions */
+.dg{display:inline-block;height:1.1em;overflow:hidden;vertical-align:-.2em;
+  -webkit-mask-image:linear-gradient(transparent,#000 10%,#000 90%,transparent);mask-image:linear-gradient(transparent,#000 10%,#000 90%,transparent)}
+.dg > span{display:block;will-change:transform}
+.dg > span > span{display:block;height:1.1em;line-height:1.1em}
+
+/* ---------- Header ---------- */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;flex-wrap:wrap;gap:14px 22px;align-items:center;justify-content:space-between;
+  padding:14px 18px;margin-bottom:20px;border-radius:20px;background:var(--surface);border:1px solid var(--stroke);
+  backdrop-filter:blur(24px) saturate(170%);-webkit-backdrop-filter:blur(24px) saturate(170%)}
+@supports (animation-timeline:scroll()){
+  .top{animation:edge linear both;animation-timeline:scroll();animation-range:0 90px}
+  @keyframes edge{to{background:rgba(16,20,32,.84);border-color:rgba(255,255,255,.12);box-shadow:0 12px 32px -14px rgba(0,0,0,.9)}}
+}
+.eyebrow{font-size:12px;font-weight:500;color:var(--muted)}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(20px,3vw,26px);line-height:1.1;margin:2px 0 0;letter-spacing:-.018em;text-wrap:balance}
+
+.seg{position:relative;display:inline-grid;grid-template-columns:1fr 1fr;background:rgba(118,118,128,.24);border-radius:9px;padding:2px;width:200px}
+.seg .pill{position:absolute;top:2px;bottom:2px;left:2px;width:calc(50% - 2px);border-radius:7px;background:var(--surface-strong);box-shadow:0 3px 8px rgba(0,0,0,.35),0 0 0 .5px rgba(255,255,255,.08)}
+.seg button{position:relative;z-index:1;border:0;background:transparent;color:var(--muted);font-weight:600;font-size:13px;padding:6px 10px;border-radius:7px;cursor:pointer;transition:color .2s}
+.seg button:hover,.seg button[aria-selected="true"]{color:var(--ink)}
+
+/* ---------- Panels ---------- */
+.panel{position:relative;isolation:isolate;background:var(--surface);border:1px solid var(--stroke);border-radius:22px;padding:20px;min-width:0;
+  backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%)}
+/* pointer light: the glass catches a soft light where the pointer is */
+#board .panel::before{content:"";position:absolute;inset:0;border-radius:inherit;z-index:-1;pointer-events:none;opacity:0;transition:opacity .5s;
+  background:radial-gradient(380px circle at var(--mx,50%) var(--my,50%),rgba(120,170,255,.09),transparent 60%)}
+@media (hover:hover) and (pointer:fine){#board .panel:hover::before{opacity:1}}
+/* ambient glint: one faint light sweep crosses the board left to right, every 14s */
+#board .panel::after{content:"";position:absolute;inset:0;border-radius:inherit;z-index:-1;pointer-events:none;
+  background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.06) 50%,transparent 62%) no-repeat;background-size:260% 100%;background-position:100% 0;
+  animation:glint 14s ease-in-out infinite;animation-delay:calc(var(--g,0s) + 2.5s)}
+@keyframes glint{0%{background-position:100% 0}13%,100%{background-position:0% 0}}
+
+.phead{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px}
+.ptitle{display:flex;align-items:center;gap:10px;min-width:0}
+.phead h2{font-family:var(--display);font-weight:650;font-size:17px;margin:0;letter-spacing:-.012em}
+.meta{font-size:12px;color:var(--dim)}
+
+.chip{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:12px;padding:4px 10px 4px 8px;border-radius:980px;white-space:nowrap;
+  color:var(--tone);background:color-mix(in srgb,var(--tone) 15%,transparent);transition:color .35s,background-color .35s}
+.chip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
+
+/* ---------- KPI strip ---------- */
+.strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px}
+@media (max-width:720px){.strip{grid-template-columns:minmax(0,1fr)}}
+.kpi{display:flex;flex-direction:column;gap:12px}
+.klabel{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--muted)}
+.kpi .num{font-size:clamp(32px,3.6vw,42px)}
+.kpi .chip{align-self:flex-start}
+
+/* ---------- Grid ---------- */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:stretch}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.patch-panel{margin-bottom:12px}
+.patch-body{display:grid;grid-template-columns:auto minmax(0,1.2fr) minmax(0,1fr);gap:32px;align-items:center}
+@media (max-width:1000px){.patch-body{grid-template-columns:auto minmax(0,1fr)}.patch-body .jobs{grid-column:1/-1;grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:560px){.patch-body{grid-template-columns:minmax(0,1fr);justify-items:center}.patch-body .jobs{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ---------- Ring ---------- */
+.ring-body{display:grid;grid-template-columns:auto minmax(0,1fr);gap:28px;align-items:center}
+@media (max-width:560px){.ring-body{grid-template-columns:minmax(0,1fr);justify-items:center;text-align:center}}
+.ring{position:relative;width:184px;max-width:100%;aspect-ratio:1}
+.ring.small{width:136px}
+.ring svg{width:100%;height:100%;display:block;overflow:visible}
+.ring .track{fill:none;stroke:color-mix(in srgb,var(--tone) 18%,transparent);shape-rendering:geometricPrecision;transition:stroke .35s}
+.ring .val{fill:none;stroke:var(--tone);stroke-linecap:round;shape-rendering:geometricPrecision;transition:stroke .35s;
+  filter:drop-shadow(0 0 5px color-mix(in srgb,var(--tone) 55%,transparent))}
+.ring .tick{stroke:#fff;stroke-width:2.5;stroke-linecap:round}
+.ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none}
+.ring-center .num{font-size:40px}
+.ring.small .ring-center .num{font-size:30px}
+.ring-sub{font-size:11.5px;font-weight:500;color:var(--muted);margin-top:5px;line-height:1.3}
+
+/* ---------- Meters ---------- */
+.meters{display:flex;flex-direction:column;gap:22px;width:100%;min-width:0}
+.mhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:9px}
+.mname{font-weight:600;font-size:14px}
+.mright .num{font-size:20px}
+.bar{position:relative;height:8px;border-radius:4px;background:color-mix(in srgb,var(--tone) 18%,transparent);transition:background-color .35s}
+.bar span{display:block;height:100%;width:0;border-radius:4px;background:var(--tone);transition:background-color .35s;box-shadow:0 0 8px color-mix(in srgb,var(--tone) 55%,transparent)}
+.bar .tick{position:absolute;top:-4px;bottom:-4px;width:2.5px;margin-left:-1.25px;border-radius:2px;background:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.85)}
+.meters .legend{font-size:12px;color:var(--dim);display:flex;align-items:center;gap:7px}
+.meters .legend::before{content:"";width:2.5px;height:12px;border-radius:2px;background:#fff}
+
+/* ---------- Jobs ---------- */
+.jobs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%}
+.job{background:rgba(255,255,255,.04);border-radius:14px;padding:12px;min-width:0}
+.job .t{font-size:12px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:6px}
+.job .num{font-size:24px;margin-top:6px}
+.job .sub{font-size:11.5px;color:var(--dim);margin-top:4px;line-height:1.3}
+.live{width:6px;height:6px;border-radius:50%;background:var(--blue);box-shadow:0 0 6px var(--blue);animation:live 2s ease-in-out infinite}
+@keyframes live{50%{opacity:.3}}
+
+/* ---------- Inset grouped lists ---------- */
+.list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:1px;border-radius:14px;overflow:hidden;background:var(--stroke-soft)}
+.list > *{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;background:var(--row);font-size:14px;min-width:0}
+.notes{margin-top:18px}
+.notes li{display:block;color:var(--ink)}
+.notes li.empty{color:var(--muted)}
+.list dt{color:var(--muted)}
+.list dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);text-align:right}
+.list dd.tone{color:var(--tone)}
+
+/* ---------- Backups ---------- */
+.tclients .h{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:8px}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:980px;color:var(--crit);background:color-mix(in srgb,var(--crit) 15%,transparent);overflow-wrap:anywhere}
+.none{font-weight:600;font-size:15px;color:var(--tone)}
+
+/* ---------- Windows 10 ---------- */
+.w10-top{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end;margin-bottom:18px}
+.w10-top .num{font-size:56px;letter-spacing:-.035em}
+.w10-cap{font-size:13px;color:var(--muted);margin-top:6px}
+
+/* ---------- Admin: System Settings two-pane ---------- */
+.admin-shell{display:grid;grid-template-columns:248px minmax(0,1fr);gap:20px;align-items:start}
+.side{position:sticky;top:112px;display:flex;flex-direction:column;gap:2px;padding:8px;border-radius:18px}
+.side-item{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;color:var(--ink);font-weight:500;font-size:14px;
+  padding:8px 10px;border-radius:10px;cursor:pointer;text-align:left;transition:background-color .15s}
+.side-item:hover{background:rgba(255,255,255,.06)}
+.side-item[aria-selected="true"]{background:var(--blue);color:#fff}
+.si-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.si-val{font-size:13px;font-weight:600;color:var(--tone,var(--muted));font-variant-numeric:tabular-nums}
+.side-item[aria-selected="true"] .si-val{color:rgba(255,255,255,.88)}
+.side-item.dirty .si-name::after{content:"";display:inline-block;width:6px;height:6px;margin-left:7px;border-radius:50%;background:var(--blue);vertical-align:middle}
+.side-item[aria-selected="true"].dirty .si-name::after{background:#fff}
+@media (max-width:760px){
+  .admin-shell{grid-template-columns:minmax(0,1fr)}
+  .side{position:static;flex-direction:row;overflow-x:auto;gap:4px;scrollbar-width:none}
+  .side::-webkit-scrollbar{display:none}
+  .side-item{flex:none;width:auto}
+  .si-val{display:none}
+}
+
+.pane{animation:paneIn .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes paneIn{from{opacity:0;transform:translateY(6px)}}
+.pane-head{margin:2px 0 4px}
+.pane-head h2{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:-.018em;margin:0 0 3px}
+.pane-head p{margin:0;font-size:13.5px;color:var(--muted)}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 22px;align-items:stretch}
+@media (max-width:980px){.cols{grid-template-columns:minmax(0,1fr)}}
+.col{display:flex;flex-direction:column;min-width:0}
+.col.fill > .list:last-of-type{flex:1}
+.col.fill > .list:last-of-type > .row.stack{flex:1;display:flex;align-items:stretch}
+.col.fill textarea{flex:1}
+
+.gtitle{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--muted);margin:22px 0 8px 4px}
+.gfoot{font-size:12px;color:var(--dim);margin:7px 4px 0;line-height:1.4}
+.admin .list{background:rgba(255,255,255,.06)}
+.admin .list > *{background:rgba(14,17,28,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.row label,.row .k{color:var(--ink);flex:1;min-width:0}
+.row label{cursor:text}
+.row.derived .k{color:var(--muted)}
+.row.derived output{margin-right:calc(1.1em + 3px);font-weight:600;font-variant-numeric:tabular-nums;color:var(--tone,var(--ink));transition:color .25s}
+.list .row:focus-within{background:rgba(32,36,50,.9)}
+.field{display:flex;align-items:center;gap:3px;color:var(--muted);flex:none}
+.field input{width:6ch;border:0;background:transparent;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums;font-weight:600;padding:2px 0;outline:none}
+.field input.w-text{width:min(18ch,40vw)}
+.field input[type=date]{width:auto}
+.field input[readonly]{color:var(--dim);cursor:not-allowed}
+.field .unit{width:1.1em;text-align:left}
+.field input::-webkit-outer-spin-button,.field input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.field input[type=number]{-moz-appearance:textfield}
+.row.stack{display:block;padding:0}
+.row.stack textarea{display:block;width:100%;min-height:110px;border:0;background:transparent;color:var(--ink);padding:12px 14px;line-height:1.5;resize:vertical;outline:none}
+.row.stack textarea.json{font-family:var(--mono);font-size:12.5px;min-height:420px;white-space:pre;overflow-x:auto;color:#b8f5d0}
+textarea::placeholder{color:var(--dim)}
+
+.lock{width:30px;height:30px;margin-left:10px;border-radius:50%;border:0;display:grid;place-items:center;cursor:pointer;
+  color:var(--muted);background:rgba(118,118,128,.24);transition:color .2s,background-color .2s,transform .1s ease-out}
+.lock svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.lock[aria-pressed="false"]{color:var(--warn);background:color-mix(in srgb,var(--warn) 18%,transparent)}
+.lock:active{transform:scale(.92)}
+.mini{margin-left:10px;border:0;background:rgba(118,118,128,.24);color:var(--blue);font-weight:600;font-size:13px;padding:4px 11px;border-radius:980px;cursor:pointer;transition:transform .1s ease-out}
+.mini:active{transform:scale(.94)}
+
+.btnrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.btn{border:0;background:rgba(118,118,128,.24);color:var(--blue);font-weight:600;font-size:14px;padding:8px 16px;border-radius:980px;cursor:pointer;white-space:nowrap;transition:transform .1s ease-out,background-color .15s,color .15s}
+.btn:active{transform:scale(.96);background:rgba(118,118,128,.36)}
+.btn.danger{color:var(--crit)}
+.btn.armed{background:var(--crit);color:#fff}
+.btn.primary{background:var(--blue);color:#fff;box-shadow:0 6px 18px -8px var(--blue)}
+.btn.primary:active{background:color-mix(in srgb,var(--blue) 85%,#000)}
+.file-in{display:none}
+
+.actions{position:sticky;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);z-index:4;margin-top:24px;display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;justify-content:space-between;
+  padding:12px 12px 12px 18px;border-radius:18px;background:rgba(16,20,32,.84);border:1px solid var(--stroke);
+  backdrop-filter:blur(24px) saturate(170%);-webkit-backdrop-filter:blur(24px) saturate(170%);box-shadow:0 14px 34px -16px rgba(0,0,0,.9)}
+.msg{font-size:13px;color:var(--muted);min-width:0;flex:1 1 220px;transition:color .25s}
+.msg.ok{color:var(--good)} .msg.err{color:var(--crit)} .msg.edit{color:var(--blue)}
+.actions .btnrow{margin:0}
+
+/* entrance: rests visible, materializes once on load */
+.rise{animation:rise .55s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:var(--d,0s)}
+@keyframes rise{from{opacity:0;transform:translateY(10px) scale(.985);filter:blur(5px)}}
+.settled .rise{animation:none}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="g-patch" viewBox="0 0 24 24"><path d="M12 3.5v11M7.5 10 12 14.5 16.5 10M4.5 17.5v2h15v-2"/></symbol>
+  <symbol id="g-backup" viewBox="0 0 24 24"><path d="M4.2 12a7.8 7.8 0 1 0 2.3-5.5"/><path d="M4.2 4.2v4.3h4.3"/><path d="M12 8v4.2l2.8 1.8"/></symbol>
+  <symbol id="g-w10" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8.5 20h7M12 16.5V20"/></symbol>
+  <symbol id="g-data" viewBox="0 0 24 24"><path d="M8.5 5.5c-2 0-2.5 1-2.5 2.5v2.5c0 1-.6 1.5-1.5 1.5.9 0 1.5.5 1.5 1.5V16c0 1.5.5 2.5 2.5 2.5M15.5 5.5c2 0 2.5 1 2.5 2.5v2.5c0 1 .6 1.5 1.5 1.5-.9 0-1.5.5-1.5 1.5V16c0 1.5-.5 2.5-2.5 2.5"/></symbol>
+  <symbol id="g-lock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="g-unlock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 7.6-1.7"/></symbol>
+</svg>
+
+<div class="sky" aria-hidden="true"><i></i><i></i></div>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow" id="stamp"></div>
+      <h1>Patch &amp; Backup Health</h1>
+    </div>
+    <div class="seg" id="seg" role="tablist" aria-label="View">
+      <span class="pill" id="pill" aria-hidden="true"></span>
+      <button role="tab" id="tab-board" aria-selected="true" aria-controls="board">Board</button>
+      <button role="tab" id="tab-admin" aria-selected="false" aria-controls="admin">Admin</button>
+    </div>
+  </header>
+
+  <main id="board" role="tabpanel" aria-labelledby="tab-board">
+    <div class="strip">
+      <article class="panel kpi rise">
+        <div class="klabel"><span class="ico sm id-patch"><svg><use href="#g-patch"/></svg></span>Patch compliance</div>
+        <div class="num" id="k-patch"><b></b><i>%</i></div>
+        <span class="chip" id="k-patch-chip"></span>
+      </article>
+      <article class="panel kpi rise" style="--d:.05s">
+        <div class="klabel"><span class="ico sm id-backup"><svg><use href="#g-backup"/></svg></span>Backup success</div>
+        <div class="num" id="k-backup"><b></b><i>%</i></div>
+        <span class="chip" id="k-backup-chip"></span>
+      </article>
+      <article class="panel kpi rise" style="--d:.1s">
+        <div class="klabel"><span class="ico sm id-w10"><svg><use href="#g-w10"/></svg></span>Windows 10 remaining</div>
+        <div class="num" id="k-w10"><b></b><small>devices</small></div>
+        <span class="chip" id="k-w10-chip"></span>
+      </article>
+    </div>
+
+    <section class="panel rise patch-panel" style="--d:.15s" aria-labelledby="h-patch">
+      <div class="phead">
+        <div class="ptitle"><span class="ico id-patch"><svg><use href="#g-patch"/></svg></span><h2 id="h-patch">Patching</h2></div>
+        <span class="meta" id="p-updated"></span>
+      </div>
+      <div class="patch-body">
+        <div class="ring" id="ring-patch">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="track" cx="60" cy="60" r="52" stroke-width="8"/>
+            <circle class="val" cx="60" cy="60" r="52" stroke-width="8" transform="rotate(-90 60 60)" style="opacity:0"/>
+            <line class="tick" id="ring-patch-tick" x1="60" y1="2.5" x2="60" y2="13.5"/>
+          </svg>
+          <div class="ring-center">
+            <div class="num" id="c-patch"><b></b><i>%</i></div>
+            <div class="ring-sub">Overall</div>
+          </div>
+        </div>
+        <div class="meters">
+          <div id="m-servers">
+            <div class="mhead"><span class="mname">Servers</span><span class="mright"><span class="num"><b></b><i>%</i></span></span></div>
+            <div class="bar"><span></span><i class="tick"></i></div>
+          </div>
+          <div id="m-ws">
+            <div class="mhead"><span class="mname">Workstations</span><span class="mright"><span class="num"><b></b><i>%</i></span></span></div>
+            <div class="bar"><span></span><i class="tick"></i></div>
+          </div>
+          <span class="legend" id="target-legend"></span>
+        </div>
+        <div class="jobs">
+          <div class="job"><div class="t">Queued</div><div class="num" id="j-queued"><b></b></div><div class="sub">Total in queue</div></div>
+          <div class="job"><div class="t">Pending</div><div class="num" id="j-pending"><b></b></div><div class="sub">Awaiting install or reboot</div></div>
+          <div class="job"><div class="t">Running <span class="live" aria-hidden="true"></span></div><div class="num" id="j-running"><b></b></div><div class="sub">Installing now</div></div>
+          <div class="job"><div class="t">Daytime</div><div class="num" id="j-daytime"><b></b></div><div class="sub">Missed-window catch-up</div></div>
+        </div>
+      </div>
+      <ul class="list notes" id="p-notes"></ul>
+    </section>
+
+    <div class="grid">
+      <section class="panel rise" style="--d:.2s" aria-labelledby="h-backup">
+        <div class="phead">
+          <div class="ptitle"><span class="ico id-backup"><svg><use href="#g-backup"/></svg></span><h2 id="h-backup">Backups</h2></div>
+          <span class="chip" id="b-chip"></span>
+        </div>
+        <div class="ring-body">
+          <div class="ring small" id="ring-backup">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <circle class="track" cx="60" cy="60" r="50" stroke-width="9"/>
+              <circle class="val" cx="60" cy="60" r="50" stroke-width="9" transform="rotate(-90 60 60)" style="opacity:0"/>
+            </svg>
+            <div class="ring-center">
+              <div class="num" id="c-backup"><b></b><i>%</i></div>
+              <div class="ring-sub">Successful</div>
+            </div>
+          </div>
+          <div class="tclients"><div class="h">Troubled clients</div><div id="b-troubled"></div></div>
+        </div>
+        <ul class="list notes" id="b-notes"></ul>
+      </section>
+
+      <section class="panel rise" style="--d:.25s" aria-labelledby="h-w10">
+        <div class="phead">
+          <div class="ptitle"><span class="ico id-w10"><svg><use href="#g-w10"/></svg></span><h2 id="h-w10">Windows 10 retirement</h2></div>
+          <span class="chip" id="w-chip"></span>
+        </div>
+        <div class="w10-top">
+          <div><div class="num" id="w-num"><b></b></div><div class="w10-cap">devices still on Windows 10</div></div>
+          <span class="chip" id="w-delta"></span>
+        </div>
+        <dl class="list" id="w-facts"></dl>
+      </section>
+    </div>
+  </main>
+
+  <section id="admin" class="admin" role="tabpanel" aria-labelledby="tab-admin" hidden>
+    <div class="admin-shell">
+      <nav class="panel side" role="tablist" aria-label="Admin sections" aria-orientation="vertical" id="side">
+        <button class="side-item" role="tab" type="button" data-pane="patch" aria-selected="true" aria-controls="pane-patch">
+          <span class="ico md id-patch"><svg><use href="#g-patch"/></svg></span><span class="si-name">Patching</span><span class="si-val" id="si-patch"></span></button>
+        <button class="side-item" role="tab" type="button" data-pane="backup" aria-selected="false" aria-controls="pane-backup">
+          <span class="ico md id-backup"><svg><use href="#g-backup"/></svg></span><span class="si-name">Backups</span><span class="si-val" id="si-backup"></span></button>
+        <button class="side-item" role="tab" type="button" data-pane="w10" aria-selected="false" aria-controls="pane-w10">
+          <span class="ico md id-w10"><svg><use href="#g-w10"/></svg></span><span class="si-name">Windows 10</span><span class="si-val" id="si-w10"></span></button>
+        <button class="side-item" role="tab" type="button" data-pane="data" aria-selected="false" aria-controls="pane-data">
+          <span class="ico md id-data"><svg><use href="#g-data"/></svg></span><span class="si-name">Data &amp; JSON</span><span class="si-val"></span></button>
+      </nav>
+
+      <div class="panes">
+        <!-- Patching -->
+        <div class="pane" id="pane-patch" role="tabpanel">
+          <div class="pane-head"><h2>Patching</h2><p>Compliance figures, job counts and the notes shown under the Patching panel.</p></div>
+          <div class="cols">
+            <div class="col">
+              <div class="gtitle">Compliance</div>
+              <div class="list">
+                <div class="row"><label for="a-target">Target</label><span class="field"><input id="a-target" type="number" step="any" inputmode="decimal" readonly aria-describedby="a-target-hint"><span class="unit">%</span>
+                  <button class="lock" type="button" id="btn-lock" aria-pressed="true" aria-label="Unlock target to edit" title="Unlock to edit"><svg><use href="#g-lock"/></svg></button></span></div>
+                <div class="row"><label for="a-overall">Overall</label><span class="field"><input id="a-overall" type="number" step="any" inputmode="decimal"><span class="unit">%</span></span></div>
+                <div class="row"><label for="a-servers">Servers</label><span class="field"><input id="a-servers" type="number" step="any" inputmode="decimal"><span class="unit">%</span></span></div>
+                <div class="row"><label for="a-ws">Workstations</label><span class="field"><input id="a-ws" type="number" step="any" inputmode="decimal"><span class="unit">%</span></span></div>
+              </div>
+              <p class="gfoot" id="a-target-hint">Target is locked. Tap the lock to change it.</p>
+
+              <div class="gtitle">Jobs</div>
+              <div class="list">
+                <div class="row"><label for="a-pending">Pending</label><span class="field"><input id="a-pending" type="number" step="any" inputmode="numeric"><span class="unit"></span></span></div>
+                <div class="row"><label for="a-running">Running</label><span class="field"><input id="a-running" type="number" step="any" inputmode="numeric"><span class="unit"></span></span></div>
+                <div class="row"><label for="a-daytime">Daytime</label><span class="field"><input id="a-daytime" type="number" step="any" inputmode="numeric"><span class="unit"></span></span></div>
+                <div class="row derived"><span class="k">Queued (pending + running)</span><output id="d-queued"></output></div>
+              </div>
+            </div>
+            <div class="col fill">
+              <div class="gtitle">Last updated</div>
+              <div class="list">
+                <div class="row"><label for="a-updated">Shown on the Board</label><span class="field"><input id="a-updated" class="w-text" type="text"><button class="mini" type="button" id="btn-now">Now</button></span></div>
+              </div>
+              <div class="gtitle">Notes</div>
+              <div class="list"><div class="row stack"><textarea id="a-pnotes" aria-label="Patching notes" placeholder="One note per line"></textarea></div></div>
+              <p class="gfoot">One note per line.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Backups -->
+        <div class="pane" id="pane-backup" role="tabpanel" hidden>
+          <div class="pane-head"><h2>Backups</h2><p>Success rate, clients that need attention, and the notes shown under the Backups panel.</p></div>
+          <div class="cols">
+            <div class="col fill">
+              <div class="gtitle">Success</div>
+              <div class="list">
+                <div class="row"><label for="a-backup">Overall</label><span class="field"><input id="a-backup" type="number" step="any" inputmode="decimal"><span class="unit">%</span></span></div>
+              </div>
+              <div class="gtitle">Notes</div>
+              <div class="list"><div class="row stack"><textarea id="a-bnotes" aria-label="Backup notes" placeholder="One note per line"></textarea></div></div>
+            </div>
+            <div class="col fill">
+              <div class="gtitle">Troubled clients</div>
+              <div class="list"><div class="row stack"><textarea id="a-troubled" aria-label="Troubled clients" placeholder="One client per line" style="min-height:220px"></textarea></div></div>
+              <p class="gfoot" id="b-count">One client per line. Leave blank for none.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Windows 10 -->
+        <div class="pane" id="pane-w10" role="tabpanel" hidden>
+          <div class="pane-head"><h2>Windows 10 upgrades</h2><p>Devices still to move off Windows 10, and the end-of-support date the countdown uses.</p></div>
+          <div class="cols">
+            <div class="col">
+              <div class="gtitle">Devices</div>
+              <div class="list">
+                <div class="row"><label for="a-rem">Remaining devices</label><span class="field"><input id="a-rem" type="number" step="any" inputmode="numeric"><span class="unit"></span></span></div>
+                <div class="row"><label for="a-last">Last month</label><span class="field"><input id="a-last" type="number" step="any" inputmode="numeric"><span class="unit"></span></span></div>
+                <div class="row"><label for="a-eol">End-of-support date</label><span class="field"><input id="a-eol" type="date"></span></div>
+              </div>
+            </div>
+            <div class="col">
+              <div class="gtitle">Calculated</div>
+              <div class="list">
+                <div class="row derived"><span class="k">Change from last month</span><output id="d-delta"></output></div>
+                <div class="row derived"><span class="k" id="d-eol-k">Days past end of support</span><output id="d-eol"></output></div>
+              </div>
+              <p class="gfoot">Updates as you type. The Board uses these after you save.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Data -->
+        <div class="pane" id="pane-data" role="tabpanel" hidden>
+          <div class="pane-head"><h2>Data &amp; JSON</h2><p>The full dashboard data in one place, for backups, moving between computers, or bulk edits.</p></div>
+          <div class="gtitle">Raw JSON</div>
+          <div class="list"><div class="row stack"><textarea id="a-raw" class="json" spellcheck="false" aria-label="Full dashboard data as JSON"></textarea></div></div>
+          <p class="gfoot">Paste a complete JSON payload and choose Save JSON to replace everything at once.</p>
+          <div class="btnrow">
+            <button class="btn" type="button" id="btn-copy">Copy JSON</button>
+            <button class="btn" type="button" id="btn-savejson">Save JSON</button>
+            <button class="btn" type="button" id="btn-export">Export JSON file</button>
+            <button class="btn" type="button" id="btn-import">Import JSON file</button>
+            <button class="btn danger" type="button" id="btn-reset">Reset to defaults</button>
+            <input type="file" id="file-in" class="file-in" accept=".json,application/json">
+          </div>
+        </div>
+
+        <div class="actions">
+          <span class="msg" id="msg" role="status">Saved data stays in this browser on this computer. Use Export JSON file to move it elsewhere.</span>
+          <div class="btnrow">
+            <button class="btn" type="button" id="btn-revert">Discard edits</button>
+            <button class="btn primary" type="button" id="btn-save">Save to board</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const $ = s => document.querySelector(s);
+  const $$ = s => document.querySelectorAll(s);
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const clamp = v => Math.max(0, Math.min(100, v ?? 0));
+  const num = v => (v === null || v === undefined || v === "" || isNaN(Number(v))) ? null : Number(v);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const listOf = v => Array.isArray(v) ? v.filter(Boolean) : (v ? String(v).split("\n").map(s => s.trim()).filter(Boolean) : []);
+  const linesOf = v => Array.isArray(v) ? v.join("\n") : (v ?? "");
+  const toLines = s => s.split("\n").map(x => x.trim()).filter(Boolean);
+  const clone = o => JSON.parse(JSON.stringify(o));
+
+  const STORE_KEY = "patchBackupHealth.data.v1";
+  const DEFAULT_DATA = {
+    patching: {
+      targetPercentage: 95, overall: 95, servers: 98, workstations: 95,
+      jobs: { pending: 113, running: 3, daytime: 227 },
+      notes: ["Patches are still being pushed out or have pending reboots so they can complete."],
+      lastUpdated: "9/30/26 10:45am"
+    },
+    backups: { overall: 98, troubledClients: null, notes: "2 parked backups for retention are the cause of the 2% drop." },
+    windows10: { remaining: 59, lastMonth: 60, eolDate: "2025-10-14" }
+  };
+
+  function loadData(){
+    try { const raw = localStorage.getItem(STORE_KEY); if (raw) return JSON.parse(raw); } catch(e){}
+    return clone(DEFAULT_DATA);
+  }
+  function storeData(obj){
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(obj)); return true; } catch(e){ return false; }
+  }
+
+  let data = loadData(), targetLocked = true, saving = false, resetArmed = false, resetTimer = null;
+
+  /* Status rules, carried over from the production board */
+  const patchTone = v => v === null ? "info" : v >= 95 ? "good" : v >= 75 ? "warn" : "crit";
+  const backupTone = (v, n) => v === null ? "info" : v >= 100 ? "good" : n > 0 ? "crit" : "blue";
+  const patchLabel = { good: "On target", warn: "Below target", crit: "Needs attention", info: "No data" };
+  const backupLabel = { good: "Healthy", blue: "Below 100%", crit: "Needs attention", info: "No data" };
+
+  function tone(el, t){
+    el.classList.remove("t-good", "t-warn", "t-crit", "t-blue", "t-info");
+    el.classList.add("t-" + t);
+  }
+  function eolDaysOf(eolDate){
+    if (!eolDate) return null;
+    const eol = new Date(eolDate + "T00:00:00");
+    if (isNaN(eol)) return null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return Math.round((today - eol) / 864e5);
+  }
+
+  /* Springs keyed per element: re-targeting mid-flight keeps the live position and velocity.
+     Parameterized as damping ratio + response, the way Apple describes them. */
+  const springs = new Map();
+  function spring(key, to, apply, { damping = 1, response = 0.55, from = 0 } = {}){
+    let s = springs.get(key);
+    if (!s){ s = { x: from, v: 0, running: false }; springs.set(key, s); }
+    s.to = to; s.apply = apply;
+    s.k = (2 * Math.PI / response) ** 2;
+    s.c = 2 * damping * Math.sqrt(s.k);
+    if (reduced){ s.x = to; s.v = 0; apply(to); return; }
+    if (s.running) return;
+    s.running = true;
+    let last = null;
+    const step = now => {
+      const dt = last === null ? 1 / 60 : Math.min((now - last) / 1000, 1 / 30);
+      last = now;
+      s.v += (-s.k * (s.x - s.to) - s.c * s.v) * dt;
+      s.x += s.v * dt;
+      if (Math.abs(s.x - s.to) < 0.002 && Math.abs(s.v) < 0.01){ s.x = s.to; s.v = 0; s.apply(s.to); s.running = false; return; }
+      s.apply(s.x);
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  /* Digit reels. Each digit gets its own column (0–9 plus a wrap 0).
+     First appearance: every column makes one full turn and lands, cascading left to right.
+     Later changes: each column rolls the short way to its new digit. */
+  const REEL = "<span>" + "01234567890".split("").map(n => `<span>${n}</span>`).join("") + "</span>";
+  function buildReels(b, str){
+    b.innerHTML = `<span class="sr">${str}</span>` +
+      [...str].map(ch => /\d/.test(ch) ? `<span class="dg" aria-hidden="true">${REEL}</span>` : `<span aria-hidden="true">${ch}</span>`).join("");
+  }
+  function number(key, el, to){
+    const b = el.querySelector("b");
+    if (to === null){ b.textContent = "—"; b.dataset.sig = ""; return; }
+    const str = Number.isInteger(to) ? String(to) : to.toFixed(1);
+    const sig = str.replace(/\d/g, "d");
+    if (b.dataset.sig !== sig){
+      buildReels(b, str); b.dataset.sig = sig;
+      for (let i = 0; i < 10; i++) springs.delete(key + "-" + i);
+    } else {
+      b.querySelector(".sr").textContent = str;
+    }
+    const digits = str.replace(/\D/g, "");
+    b.querySelectorAll(".dg > span").forEach((reel, i) => {
+      const d = Number(digits[i]), k = key + "-" + i, s = springs.get(k);
+      const apply = p => { const y = ((p % 10) + 10) % 10; reel.style.transform = `translateY(${(-y * 1.1).toFixed(4)}em)`; };
+      if (!s){
+        apply(d - 10);
+        const go = () => spring(k, d, apply, { damping: 1, response: 1.0, from: d - 10 });
+        if (reduced) apply(d); else setTimeout(go, i * 90);
+      } else {
+        spring(k, d + 10 * Math.round((s.x - d) / 10), apply, { damping: 1, response: 0.6 });
+      }
+    });
+  }
+  function ring(key, wrap, pct, r){
+    // Round caps add sw/2 at each end: shorten the dash by sw and shift it forward sw/2,
+    // so the drawn arc spans exactly 0 → pct and the visible gap is the true remainder.
+    const c = 2 * Math.PI * r, val = wrap.querySelector(".val");
+    const sw = Number(val.getAttribute("stroke-width"));
+    val.style.strokeDashoffset = -sw / 2;
+    spring(key, clamp(pct), p => {
+      const len = Math.max(0, (p / 100) * c - sw);
+      val.style.strokeDasharray = `${len} ${c}`;
+      val.style.opacity = p < 0.5 ? 0 : 1;
+    }, { damping: 1, response: 1.1 });
+  }
+  function meter(key, wrap, value, target){
+    tone(wrap, patchTone(value));
+    number(key + "-n", wrap.querySelector(".num"), value);
+    wrap.querySelector(".tick").style.left = clamp(target) + "%";
+    const fill = wrap.querySelector(".bar span");
+    spring(key, clamp(value), p => { fill.style.width = p + "%"; }, { damping: 1, response: 1.1 });
+  }
+  const notesHtml = (list, empty) => list.length ? list.map(n => `<li>${esc(n)}</li>`).join("") : `<li class="empty">${empty}</li>`;
+
+  /* ---------- Board ---------- */
+  function render(){
+    const p = data.patching || {}, b = data.backups || {}, w = data.windows10 || {};
+    const target = num(p.targetPercentage) ?? 95;
+    const overall = num(p.overall), servers = num(p.servers), ws = num(p.workstations);
+    const j = p.jobs || {};
+    const pending = num(j.pending), running = num(j.running), daytime = num(j.daytime);
+    const bOverall = num(b.overall);
+    const troubled = listOf(b.troubledClients);
+    const rem = num(w.remaining), last = num(w.lastMonth);
+
+    $("#stamp").textContent = p.lastUpdated ? "Data as of " + p.lastUpdated : "Endpoint operations";
+    $("#p-updated").textContent = p.lastUpdated ? "Updated " + p.lastUpdated : "";
+
+    // Patching
+    const pT = patchTone(overall);
+    tone($("#k-patch"), pT); number("k-patch", $("#k-patch"), overall);
+    tone($("#k-patch-chip"), pT); $("#k-patch-chip").textContent = `${patchLabel[pT]} · target ${target}%`;
+    const rp = $("#ring-patch");
+    tone(rp, pT); ring("ring-patch", rp, overall, 52);
+    tone($("#c-patch"), pT); number("c-patch", $("#c-patch"), overall);
+    $("#ring-patch-tick").setAttribute("transform", `rotate(${clamp(target) * 3.6} 60 60)`);
+    meter("m-servers", $("#m-servers"), servers, target);
+    meter("m-ws", $("#m-ws"), ws, target);
+    $("#target-legend").textContent = `Target ${target}%`;
+    number("j-queued", $("#j-queued"), (pending ?? 0) + (running ?? 0));
+    number("j-pending", $("#j-pending"), pending);
+    number("j-running", $("#j-running"), running);
+    number("j-daytime", $("#j-daytime"), daytime);
+    $("#p-notes").innerHTML = notesHtml(listOf(p.notes), "No patching notes.");
+
+    // Backups
+    const bT = backupTone(bOverall, troubled.length);
+    tone($("#k-backup"), bT); number("k-backup", $("#k-backup"), bOverall);
+    tone($("#k-backup-chip"), bT);
+    $("#k-backup-chip").textContent = troubled.length ? `${troubled.length} troubled client${troubled.length > 1 ? "s" : ""}` : "No troubled clients";
+    tone($("#b-chip"), bT); $("#b-chip").textContent = backupLabel[bT];
+    const rb = $("#ring-backup");
+    tone(rb, bT); ring("ring-backup", rb, bOverall, 50);
+    tone($("#c-backup"), bT); number("c-backup", $("#c-backup"), bOverall);
+    const tc = $("#b-troubled");
+    tone(tc, bT);
+    tc.innerHTML = troubled.length
+      ? `<div class="tags">${troubled.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>`
+      : `<span class="none">None reported</span>`;
+    $("#b-notes").innerHTML = notesHtml(listOf(b.notes), "No backup notes.");
+
+    // Windows 10
+    const eolDays = eolDaysOf(w.eolDate);
+    const eol = w.eolDate ? new Date(w.eolDate + "T00:00:00") : null;
+    const wT = rem === 0 ? "good" : (eolDays !== null && eolDays > 0) ? "crit" : "warn";
+    tone($("#k-w10"), wT); number("k-w10", $("#k-w10"), rem);
+    tone($("#k-w10-chip"), wT);
+    $("#k-w10-chip").textContent = rem === 0 ? "Retired" : eolDays === null ? "End-of-support date not set" : eolDays > 0 ? `${eolDays} days past end of support` : `${-eolDays} days to end of support`;
+    tone($("#w-chip"), wT); $("#w-chip").textContent = rem === 0 ? "Complete" : "In progress";
+    tone($("#w-num"), wT); number("w-num", $("#w-num"), rem);
+
+    const delta = (rem !== null && last !== null) ? rem - last : null, wd = $("#w-delta");
+    tone(wd, delta === null || delta === 0 ? "info" : delta < 0 ? "good" : "crit");
+    wd.textContent = delta === null ? "No prior month" : delta < 0 ? `${-delta} fewer than last month` : delta > 0 ? `${delta} more than last month` : "No change from last month";
+
+    const fw = $("#w-facts");
+    tone(fw, wT);
+    fw.innerHTML = `
+      <div><dt>Last month</dt><dd>${last ?? "—"}</dd></div>
+      <div><dt>End of support</dt><dd>${eol && !isNaN(eol) ? eol.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—"}</dd></div>
+      <div><dt>${eolDays !== null && eolDays <= 0 ? "Days to end of support" : "Days past end of support"}</dt><dd class="${eolDays > 0 ? "tone" : ""}">${eolDays === null ? "—" : Math.abs(eolDays)}</dd></div>`;
+
+    // Admin sidebar summaries
+    const sp = $("#si-patch"); tone(sp, pT); sp.textContent = overall === null ? "—" : overall + "%";
+    const sb = $("#si-backup"); tone(sb, bT); sb.textContent = bOverall === null ? "—" : bOverall + "%";
+    const sw = $("#si-w10"); tone(sw, wT); sw.textContent = rem ?? "—";
+  }
+
+  /* ---------- Admin ---------- */
+  const val = (id, v) => { $(id).value = v ?? ""; };
+  function fillAdmin(){
+    const p = data.patching || {}, j = p.jobs || {}, b = data.backups || {}, w = data.windows10 || {};
+    val("#a-target", p.targetPercentage); val("#a-overall", p.overall); val("#a-servers", p.servers); val("#a-ws", p.workstations);
+    val("#a-pending", j.pending); val("#a-running", j.running); val("#a-daytime", j.daytime); val("#a-updated", p.lastUpdated);
+    val("#a-pnotes", linesOf(p.notes));
+    val("#a-backup", b.overall); val("#a-troubled", linesOf(b.troubledClients)); val("#a-bnotes", linesOf(b.notes));
+    val("#a-rem", w.remaining); val("#a-last", w.lastMonth); val("#a-eol", w.eolDate);
+    val("#a-raw", JSON.stringify(data, null, 2));
+    $$(".side-item").forEach(el => el.classList.remove("dirty"));
+    derived();
+  }
+  /* Calculated rows: recompute from what's typed, before saving */
+  function derived(){
+    const pend = num($("#a-pending").value), run = num($("#a-running").value);
+    $("#d-queued").textContent = (pend ?? 0) + (run ?? 0);
+
+    const rem = num($("#a-rem").value), last = num($("#a-last").value);
+    const dd = $("#d-delta");
+    const delta = rem !== null && last !== null ? rem - last : null;
+    tone(dd, delta === null || delta === 0 ? "info" : delta < 0 ? "good" : "crit");
+    dd.textContent = delta === null ? "—" : delta === 0 ? "No change" : (delta < 0 ? "−" : "+") + Math.abs(delta);
+
+    const days = eolDaysOf($("#a-eol").value), de = $("#d-eol");
+    $("#d-eol-k").textContent = days !== null && days <= 0 ? "Days to end of support" : "Days past end of support";
+    tone(de, days === null ? "info" : days > 0 ? "crit" : "warn");
+    de.textContent = days === null ? "—" : Math.abs(days);
+
+    const n = toLines($("#a-troubled").value).length;
+    $("#b-count").textContent = "One client per line. Leave blank for none." + (n ? ` ${n} listed.` : "");
+  }
+  function collectForm(){
+    const v = id => $(id).value;
+    const troubled = toLines(v("#a-troubled"));
+    return {
+      patching: {
+        targetPercentage: num(v("#a-target")),
+        overall: num(v("#a-overall")),
+        servers: num(v("#a-servers")),
+        workstations: num(v("#a-ws")),
+        jobs: { pending: num(v("#a-pending")), running: num(v("#a-running")), daytime: num(v("#a-daytime")) },
+        notes: toLines(v("#a-pnotes")),
+        lastUpdated: v("#a-updated").trim()
+      },
+      backups: {
+        overall: num(v("#a-backup")),
+        troubledClients: troubled.length ? troubled : null,
+        notes: toLines(v("#a-bnotes")).join("\n")
+      },
+      windows10: { remaining: num(v("#a-rem")), lastMonth: num(v("#a-last")), eolDate: v("#a-eol") }
+    };
+  }
+
+  function setLock(locked){
+    targetLocked = locked;
+    const i = $("#a-target"), b = $("#btn-lock");
+    i.readOnly = locked;
+    b.setAttribute("aria-pressed", locked);
+    b.setAttribute("aria-label", locked ? "Unlock target to edit" : "Lock target");
+    b.title = locked ? "Unlock to edit" : "Lock target";
+    b.innerHTML = `<svg><use href="#g-${locked ? "lock" : "unlock"}"/></svg>`;
+    $("#a-target-hint").textContent = locked ? "Target is locked. Tap the lock to change it." : "Target is unlocked. It locks again when you leave Admin.";
+    if (!locked){ i.focus(); i.select(); }
+  }
+  /* While locked, every save path keeps the current target */
+  function guardTarget(obj){
+    if (!targetLocked) return { obj, kept: false };
+    const cur = data && data.patching ? data.patching.targetPercentage : undefined;
+    if (cur === undefined) return { obj, kept: false };
+    const o = clone(obj);
+    o.patching = o.patching || {};
+    const kept = o.patching.targetPercentage !== cur;
+    o.patching.targetPercentage = cur;
+    return { obj: o, kept };
+  }
+
+  function setMsg(t, cls){ const m = $("#msg"); m.textContent = t; m.className = "msg " + (cls || ""); }
+
+  function save(obj, okMsg){
+    if (saving) return;
+    saving = true;
+    const g = guardTarget(obj);
+    data = clone(g.obj);
+    const stored = storeData(data);
+    fillAdmin();
+    render();
+    if (stored) setMsg((okMsg || "Saved. The board is updated.") + (g.kept ? ` The target is locked, so it stayed at ${g.obj.patching.targetPercentage}%.` : ""), "ok");
+    else setMsg("Board updated, but this browser blocked saving. Export JSON to keep your changes.", "err");
+    saving = false;
+  }
+
+  function nowStamp(){
+    const d = new Date();
+    let h = d.getHours(); const ap = h >= 12 ? "pm" : "am"; h = h % 12 || 12;
+    return `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(2)} ${h}:${String(d.getMinutes()).padStart(2, "0")}${ap}`;
+  }
+  const isObj = o => o && typeof o === "object" && !Array.isArray(o);
+
+  /* Sidebar sections */
+  let pane = "patch";
+  try { const saved = localStorage.getItem("adminPane"); if (["patch", "backup", "w10", "data"].includes(saved)) pane = saved; } catch(e){}
+  function showPane(name, focus){
+    pane = name;
+    $$(".side-item").forEach(b => {
+      const on = b.dataset.pane === name;
+      b.setAttribute("aria-selected", on);
+      b.tabIndex = on ? 0 : -1;
+      if (on && focus) b.focus();
+    });
+    $$(".pane").forEach(p => { p.hidden = p.id !== "pane-" + name; });
+    try { localStorage.setItem("adminPane", name); } catch(e){}
+  }
+  $$(".side-item").forEach(b => b.addEventListener("click", () => showPane(b.dataset.pane)));
+  $("#side").addEventListener("keydown", e => {
+    const keys = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
+    if (!(e.key in keys)) return;
+    e.preventDefault();
+    const order = ["patch", "backup", "w10", "data"];
+    showPane(order[(order.indexOf(pane) + keys[e.key] + order.length) % order.length], true);
+  });
+
+  /* Unsaved edits: mark the section, keep the calculated rows live */
+  $("#admin").addEventListener("input", e => {
+    const p = e.target.closest(".pane");
+    if (!p) return;
+    $(`.side-item[data-pane="${p.id.slice(5)}"]`).classList.add("dirty");
+    setMsg("Unsaved changes. Choose Save to board to apply them.", "edit");
+    derived();
+  });
+
+  $("#btn-lock").addEventListener("click", () => setLock(!targetLocked));
+  $("#btn-now").addEventListener("click", () => { $("#a-updated").value = nowStamp(); $("#a-updated").dispatchEvent(new Event("input", { bubbles: true })); });
+  $("#btn-revert").addEventListener("click", () => { fillAdmin(); setMsg("Edits discarded."); });
+  $("#btn-save").addEventListener("click", () => save(collectForm()));
+  $("#btn-savejson").addEventListener("click", () => {
+    let parsed;
+    try { parsed = JSON.parse($("#a-raw").value); } catch(e){ setMsg("The JSON has a syntax error: " + e.message, "err"); return; }
+    if (!isObj(parsed)){ setMsg("The JSON must be an object with patching, backups and windows10 sections.", "err"); return; }
+    save(parsed);
+  });
+  $("#btn-copy").addEventListener("click", () => {
+    const t = $("#a-raw");
+    const fallback = () => { t.focus(); t.select(); setMsg("Copy is blocked here. The JSON is selected; copy it manually."); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t.value).then(() => setMsg("JSON copied.", "ok"), fallback); else fallback();
+  });
+  $("#btn-export").addEventListener("click", () => {
+    const d = new Date();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+    a.download = `patch-backup-health-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    setMsg("JSON file exported.", "ok");
+  });
+  $("#btn-import").addEventListener("click", () => $("#file-in").click());
+  $("#file-in").addEventListener("change", e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let parsed;
+      try { parsed = JSON.parse(reader.result); } catch(err){ setMsg("That file is not valid JSON: " + err.message, "err"); return; }
+      if (!isObj(parsed)){ setMsg("The file must contain an object with patching, backups and windows10 sections.", "err"); return; }
+      save(parsed, "Imported " + file.name + ".");
+    };
+    reader.onerror = () => setMsg("Could not read that file.", "err");
+    reader.readAsText(file);
+    e.target.value = "";
+  });
+  $("#btn-reset").addEventListener("click", () => {
+    const btn = $("#btn-reset");
+    if (!resetArmed){
+      resetArmed = true; btn.textContent = "Tap again to reset"; btn.classList.add("armed");
+      setMsg("Reset replaces all saved figures with the original defaults.", "err");
+      clearTimeout(resetTimer);
+      resetTimer = setTimeout(() => { resetArmed = false; btn.textContent = "Reset to defaults"; btn.classList.remove("armed"); }, 4000);
+      return;
+    }
+    resetArmed = false; clearTimeout(resetTimer);
+    btn.textContent = "Reset to defaults"; btn.classList.remove("armed");
+    save(clone(DEFAULT_DATA), "Reset to defaults.");
+  });
+
+  /* ---------- Tabs ---------- */
+  function movePill(btn){
+    const pill = $("#pill");
+    spring("pill", btn.offsetLeft - 2, x => { pill.style.transform = `translateX(${x}px)`; }, { damping: 1, response: 0.3 });
+  }
+  /* Content enters from the side its segment sits on: Admin from the right, Board from the left. */
+  let view = "board";
+  function show(which, instant){
+    if (which === view && !instant) return;
+    view = which;
+    const isBoard = which === "board";
+    $("#tab-board").setAttribute("aria-selected", isBoard);
+    $("#tab-admin").setAttribute("aria-selected", !isBoard);
+    movePill(isBoard ? $("#tab-board") : $("#tab-admin"));
+    if (isBoard) setLock(true); else { fillAdmin(); showPane(pane); }
+    const incoming = isBoard ? $("#board") : $("#admin");
+    $("#board").hidden = !isBoard;
+    $("#admin").hidden = isBoard;
+    try { localStorage.setItem("tab", which); } catch(e){}
+    if (isBoard) placeGlints();
+    if (instant) return;
+    const start = isBoard ? -28 : 28;
+    const s = springs.get("view");
+    if (s){ s.x = start; s.v = 0; }
+    spring("view", 0, x => {
+      incoming.style.transform = Math.abs(x) < 0.05 ? "" : `translateX(${x}px)`;
+      incoming.style.opacity = 1 - Math.min(1, Math.abs(x) / 28) * 0.9;
+    }, { damping: 1, response: 0.38, from: start });
+  }
+  $("#tab-board").addEventListener("pointerdown", () => show("board"));
+  $("#tab-admin").addEventListener("pointerdown", () => show("admin"));
+  $("#tab-board").addEventListener("click", () => show("board"));
+  $("#tab-admin").addEventListener("click", () => show("admin"));
+  $("#seg").addEventListener("keydown", e => {
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft"){
+      const next = e.key === "ArrowRight" ? "admin" : "board";
+      show(next); $("#tab-" + next).focus();
+    }
+  });
+
+  /* ---------- Ambient light on the board ---------- */
+  // The glint reaches each panel in turn, by its position, so it reads as one light crossing the board.
+  function placeGlints(){
+    requestAnimationFrame(() => {
+      $$("#board .panel").forEach(p => {
+        const r = p.getBoundingClientRect();
+        p.style.setProperty("--g", ((r.left / innerWidth) * 1.1 + (r.top / innerHeight) * 0.35).toFixed(2) + "s");
+      });
+    });
+  }
+  if (matchMedia("(hover: hover) and (pointer: fine)").matches){
+    $$("#board .panel").forEach(p => p.addEventListener("pointermove", e => {
+      const r = p.getBoundingClientRect();
+      p.style.setProperty("--mx", (e.clientX - r.left) + "px");
+      p.style.setProperty("--my", (e.clientY - r.top) + "px");
+    }));
+  }
+  addEventListener("resize", placeGlints);
+
+  /* Another tab saved: pick it up */
+  addEventListener("storage", e => {
+    if (e.key !== STORE_KEY) return;
+    data = loadData();
+    render();
+    if (view === "admin" && !$("#admin").contains(document.activeElement)) fillAdmin();
+  });
+
+  /* ---------- Boot ---------- */
+  fillAdmin();
+  let lastTab = null; try { lastTab = localStorage.getItem("tab"); } catch(e){}
+  show(lastTab === "admin" ? "admin" : "board", true);
+  // Let the glass settle in first, then bring the data to life.
+  setTimeout(render, reduced ? 0 : 320);
+  setTimeout(() => document.body.classList.add("settled"), 1200);
+})();
+</script>
+</body>
+</html>
