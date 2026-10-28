@@ -5,9 +5,9 @@
     "servers": 97,
     "workstations": 91,
     "jobs": {
-      "pending": 163,
+      "pending": 139,
       "running": 12,
-      "daytime": 233
+      "daytime": 234
     },
     "notes": [
       "Patches are still being pushed out from yesterdays patching or have pending reboots so they can complete."
