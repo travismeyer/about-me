@@ -739,8 +739,13 @@ textarea::placeholder{color:var(--dim)}
   /* Rich text fields hold HTML; older saves hold plain lines (string or array). Both render. */
   const isHtml = v => typeof v === "string" && /<[a-z][\s\S]*>/i.test(v);
   const clean = h => window.DOMPurify ? DOMPurify.sanitize(h) : esc(h.replace(/<[^>]*>/g, " "));
-  const richOf = v => isHtml(v) ? v : listOf(v).map(l => `<p>${esc(l)}</p>`).join("");
-  const notesBlock = (v, empty) => isHtml(v) ? `<li class="rich">${clean(v)}</li>` : notesHtml(listOf(v), empty);
+  // An HTML string is one block (it may contain newlines); arrays and plain strings are one note per item/line.
+  const richOf = v => isHtml(v) ? v : listOf(v).map(l => isHtml(l) ? l : `<p>${esc(l)}</p>`).join("");
+  const notesBlock = (v, empty) => {
+    if (isHtml(v)) return `<li class="rich">${clean(v)}</li>`;
+    const items = listOf(v);
+    return items.some(isHtml) ? items.map(n => `<li class="rich">${isHtml(n) ? clean(n) : esc(n)}</li>`).join("") : notesHtml(items, empty);
+  };
 
   /* ---------- Board ---------- */
   function render(){
@@ -855,6 +860,12 @@ textarea::placeholder{color:var(--dim)}
   }
   function collectForm(){
     const v = id => $(id).value;
+    // Editor ready: its HTML. Not ready (still loading, or failed): the plain box, kept as one block if it holds HTML.
+    const rteVal = (id, plain) => {
+      if (editors[id]) return editors[id].getContent();
+      const raw = v("#" + id).trim();
+      return isHtml(raw) ? raw : plain(raw);
+    };
     const troubled = toLines(v("#a-troubled"));
     return {
       patching: {
@@ -863,14 +874,14 @@ textarea::placeholder{color:var(--dim)}
         servers: num(v("#a-servers")),
         workstations: num(v("#a-ws")),
         jobs: { pending: num(v("#a-pending")), running: num(v("#a-running")), daytime: num(v("#a-daytime")) },
-        notes: editors["a-pnotes"] ? editors["a-pnotes"].getContent() : toLines(v("#a-pnotes")),
+        notes: rteVal("a-pnotes", toLines),
         lastUpdated: v("#a-updated").trim()
       },
       backups: {
         overall: num(v("#a-backup")),
         troubledClients: troubled.length ? troubled : null,
-        notes: editors["a-bnotes"] ? editors["a-bnotes"].getContent() : toLines(v("#a-bnotes")).join("\n"),
-        info: editors["a-binfo"] ? editors["a-binfo"].getContent() : v("#a-binfo")
+        notes: rteVal("a-bnotes", s => toLines(s).join("\n")),
+        info: rteVal("a-binfo", s => s)
       },
       windows10: { remaining: num(v("#a-rem")), lastMonth: num(v("#a-last")), eolDate: v("#a-eol") }
     };
