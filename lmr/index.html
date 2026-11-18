@@ -8,6 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/svg/1f6e1.svg">
 <link rel="icon" type="image/png" sizes="72x72" href="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/72x72/1f6e1.png">
 <link rel="apple-touch-icon" href="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/72x72/1f6e1.png">
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
 <style>
 /* Layout: sticky glass header + segmented control, KPI strip, full-width Patching hero row,
    Backups + Windows 10 side by side. Admin is a System Settings two-pane: sidebar + two-column sections.
@@ -189,6 +190,21 @@ h1{font-family:var(--display);font-weight:700;font-size:clamp(20px,3vw,26px);lin
 .w10-top{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end;margin-bottom:18px}
 .w10-top .num{font-size:56px;letter-spacing:-.035em}
 .w10-cap{font-size:13px;color:var(--muted);margin-top:6px}
+
+/* ---------- Backup information (rich text) ---------- */
+.info-panel{margin-top:12px}
+.rich{font-size:14.5px;line-height:1.55;overflow-wrap:anywhere;overflow-x:auto}
+.rich > :first-child{margin-top:0} .rich > :last-child{margin-bottom:0}
+.rich p{margin:0 0 .7em} .rich ul,.rich ol{margin:0 0 .7em;padding-left:1.4em}
+.rich h1,.rich h2,.rich h3,.rich h4{font-family:var(--display);letter-spacing:-.012em;margin:1em 0 .4em;line-height:1.2}
+.rich a{color:var(--blue)}
+.rich table{border-collapse:collapse;max-width:100%;margin:0 0 .7em}
+.rich th,.rich td{border:1px solid rgba(255,255,255,.14);padding:6px 10px;text-align:left;vertical-align:top}
+.rich th{background:rgba(255,255,255,.05);font-weight:600}
+.rich .empty{color:var(--muted)}
+.editor-wrap{border-radius:14px;overflow:hidden;background:rgba(14,17,28,.78)}
+.editor-wrap textarea{display:block;width:100%;min-height:320px;border:0;background:transparent;color:var(--ink);padding:12px 14px;resize:vertical;outline:none}
+.editor-wrap .tox-tinymce{border:0;border-radius:14px}
 
 /* ---------- Admin: System Settings two-pane ---------- */
 .admin-shell{display:grid;grid-template-columns:248px minmax(0,1fr);gap:20px;align-items:start}
@@ -394,7 +410,7 @@ textarea::placeholder{color:var(--dim)}
 
       <section class="panel rise" style="--d:.25s" aria-labelledby="h-w10">
         <div class="phead">
-          <div class="ptitle"><span class="ico id-w10"><svg><use href="#g-w10"/></svg></span><h2 id="h-w10">Windows 10 retirement</h2></div>
+          <div class="ptitle"><span class="ico id-w10"><svg><use href="#g-w10"/></svg></span><h2 id="h-w10">Windows 10 Retirement</h2></div>
           <span class="chip" id="w-chip"></span>
         </div>
         <div class="w10-top">
@@ -404,6 +420,13 @@ textarea::placeholder{color:var(--dim)}
         <dl class="list" id="w-facts"></dl>
       </section>
     </div>
+
+    <section class="panel rise info-panel" style="--d:.3s" aria-labelledby="h-binfo">
+      <div class="phead">
+        <div class="ptitle"><span class="ico id-backup"><svg><use href="#g-backup"/></svg></span><h2 id="h-binfo">Backup Information</h2></div>
+      </div>
+      <div class="rich" id="b-info"></div>
+    </section>
   </main>
 
   <section id="admin" class="admin" role="tabpanel" aria-labelledby="tab-admin" hidden>
@@ -486,6 +509,9 @@ textarea::placeholder{color:var(--dim)}
               <p class="gfoot" id="b-count">One client per line. Leave blank for none.</p>
             </div>
           </div>
+          <div class="gtitle">Backup Information</div>
+          <div class="editor-wrap"><textarea id="a-binfo" aria-label="Backup information"></textarea></div>
+          <p class="gfoot" id="binfo-msg">Shown in the Backup Information panel under Backups and Windows 10.</p>
         </div>
 
         <!-- Windows 10 -->
@@ -755,6 +781,10 @@ textarea::placeholder{color:var(--dim)}
       ? `<div class="tags">${troubled.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>`
       : `<span class="none">None reported</span>`;
     $("#b-notes").innerHTML = notesHtml(listOf(b.notes), "No backup notes.");
+    // Rich text from Admin: sanitized, since data.json is editable by anyone holding a repo token
+    const info = String(b.info ?? "").trim();
+    $("#b-info").innerHTML = !info ? `<p class="empty">No backup information.</p>`
+      : window.DOMPurify ? DOMPurify.sanitize(info) : esc(info.replace(/<[^>]*>/g, " "));
 
     // Windows 10
     const eolDays = eolDaysOf(w.eolDate);
@@ -791,6 +821,8 @@ textarea::placeholder{color:var(--dim)}
     val("#a-pending", j.pending); val("#a-running", j.running); val("#a-daytime", j.daytime); val("#a-updated", p.lastUpdated);
     val("#a-pnotes", linesOf(p.notes));
     val("#a-backup", b.overall); val("#a-troubled", linesOf(b.troubledClients)); val("#a-bnotes", linesOf(b.notes));
+    val("#a-binfo", b.info);
+    if (editor){ filling = true; editor.setContent(b.info ?? ""); editor.undoManager.clear(); filling = false; }
     val("#a-rem", w.remaining); val("#a-last", w.lastMonth); val("#a-eol", w.eolDate);
     val("#a-raw", JSON.stringify(data, null, 2));
     $$(".side-item").forEach(el => el.classList.remove("dirty"));
@@ -831,7 +863,8 @@ textarea::placeholder{color:var(--dim)}
       backups: {
         overall: num(v("#a-backup")),
         troubledClients: troubled.length ? troubled : null,
-        notes: toLines(v("#a-bnotes")).join("\n")
+        notes: toLines(v("#a-bnotes")).join("\n"),
+        info: editor ? editor.getContent() : v("#a-binfo")
       },
       windows10: { remaining: num(v("#a-rem")), lastMonth: num(v("#a-last")), eolDate: v("#a-eol") }
     };
@@ -950,8 +983,9 @@ textarea::placeholder{color:var(--dim)}
   const isObj = o => o && typeof o === "object" && !Array.isArray(o);
 
   /* Password gate. ponytail: client-side only (static site), so it stops casual visitors, not someone with devtools.
-     Edits only ever touch the visitor's own localStorage. Default password: printf %s 'new' | shasum -a 256
-     A password changed in Admin is stored per browser (localStorage) and overrides the default there. */
+     ADMIN_HASH is the fallback password's SHA-256 (generate one with: printf %s 'password' | shasum -a 256).
+     A password changed in Admin is written to lmr/admin.json when a GitHub token is set (every device),
+     otherwise only to that browser's localStorage, where it overrides ADMIN_HASH. */
   const ADMIN_HASH = "15ab6c350a52858970e99bb798b847b687061886a861ae8217481d3ea16cf6d7";
   // Web3Forms access key: emails go to the address the key was created with (web3forms.com). Empty = reset off.
   const RESET_KEY = "a459f392-e1bc-4e73-9a8f-cf53bbc7014c";
@@ -1088,6 +1122,42 @@ textarea::placeholder{color:var(--dim)}
     syncNote("Token removed. Saves from this device stay on this device.");
   });
 
+  /* Rich text editor for Backup Information. Loaded only when the Backups pane opens, so the Board stays light. */
+  const TINY = "https://cdn.jsdelivr.net/npm/tinymce@7.6.0";
+  let editor = null, filling = false, editorLoading = false;
+  function markBackupDirty(){
+    if (filling) return;
+    $('.side-item[data-pane="backup"]').classList.add("dirty");
+    setMsg("Unsaved changes. Choose Save to board to apply them.", "edit");
+  }
+  function ensureEditor(){
+    if (editor || editorLoading || !unlocked) return;
+    editorLoading = true;
+    const start = () => tinymce.init({
+      selector: "#a-binfo",
+      license_key: "gpl", base_url: TINY, suffix: ".min",
+      skin: "oxide-dark", content_css: "dark",
+      menubar: false, branding: false, promotion: false, statusbar: false,
+      height: 380,
+      plugins: "lists advlist table link autolink",
+      toolbar: "undo redo | blocks fontsize | bold italic underline strikethrough | forecolor backcolor | bullist numlist outdent indent | alignleft aligncenter alignright | table link | removeformat",
+      toolbar_mode: "wrap",
+      table_default_styles: { "border-collapse": "collapse" },
+      content_style: "body{background:#0e111c;color:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,system-ui,'Segoe UI',sans-serif;font-size:15px;line-height:1.5}",
+      setup: ed => ed.on("input change ExecCommand", markBackupDirty),
+      init_instance_callback: ed => {
+        editor = ed; editorLoading = false;
+        filling = true; ed.setContent((data.backups || {}).info ?? ""); ed.undoManager.clear(); filling = false;
+      }
+    });
+    if (window.tinymce) return start();
+    const s = document.createElement("script");
+    s.src = TINY + "/tinymce.min.js"; s.referrerPolicy = "origin";
+    s.onload = start;
+    s.onerror = () => { editorLoading = false; $("#binfo-msg").textContent = "The formatting toolbar could not load. You can still type HTML here."; };
+    document.head.appendChild(s);
+  }
+
   /* Sidebar sections */
   const PANES = ["patch", "backup", "w10", "data", "password", "sync"];
   let pane = "patch";
@@ -1103,6 +1173,7 @@ textarea::placeholder{color:var(--dim)}
     });
     $$(".pane").forEach(p => { p.hidden = p.id !== "pane-" + name; });
     $(".actions").hidden = name === "password" || name === "sync";
+    if (name === "backup") ensureEditor();
     try { localStorage.setItem("adminPane", name); } catch(e){}
   }
   $$(".side-item").forEach(b => b.addEventListener("click", () => showPane(b.dataset.pane)));
