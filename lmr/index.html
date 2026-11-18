@@ -204,7 +204,8 @@ h1{font-family:var(--display);font-weight:700;font-size:clamp(20px,3vw,26px);lin
 .rich .empty{color:var(--muted)}
 .editor-wrap{border-radius:14px;overflow:hidden;background:rgba(14,17,28,.78)}
 .editor-wrap textarea{display:block;width:100%;min-height:320px;border:0;background:transparent;color:var(--ink);padding:12px 14px;resize:vertical;outline:none}
-.editor-wrap .tox-tinymce{border:0;border-radius:14px}
+.editor-wrap .tox-tinymce,.row.stack .tox-tinymce{border:0;border-radius:14px}
+.notes li.rich{padding:12px 14px}
 
 /* ---------- Admin: System Settings two-pane ---------- */
 .admin-shell{display:grid;grid-template-columns:248px minmax(0,1fr);gap:20px;align-items:start}
@@ -485,8 +486,8 @@ textarea::placeholder{color:var(--dim)}
                 <div class="row"><label for="a-updated">Shown on the Board</label><span class="field"><input id="a-updated" class="w-text" type="text"><button class="mini" type="button" id="btn-now">Now</button></span></div>
               </div>
               <div class="gtitle">Notes</div>
-              <div class="list"><div class="row stack"><textarea id="a-pnotes" aria-label="Patching notes" placeholder="One note per line"></textarea></div></div>
-              <p class="gfoot">One note per line.</p>
+              <div class="list"><div class="row stack"><textarea id="a-pnotes" class="rte" data-h="260" aria-label="Patching notes"></textarea></div></div>
+              <p class="gfoot">Shown under the Patching panel.</p>
             </div>
           </div>
         </div>
@@ -501,7 +502,7 @@ textarea::placeholder{color:var(--dim)}
                 <div class="row"><label for="a-backup">Overall</label><span class="field"><input id="a-backup" type="number" step="any" inputmode="decimal"><span class="unit">%</span></span></div>
               </div>
               <div class="gtitle">Notes</div>
-              <div class="list"><div class="row stack"><textarea id="a-bnotes" aria-label="Backup notes" placeholder="One note per line"></textarea></div></div>
+              <div class="list"><div class="row stack"><textarea id="a-bnotes" class="rte" data-h="260" aria-label="Backup notes"></textarea></div></div>
             </div>
             <div class="col fill">
               <div class="gtitle">Troubled clients</div>
@@ -510,8 +511,8 @@ textarea::placeholder{color:var(--dim)}
             </div>
           </div>
           <div class="gtitle">Backup Information</div>
-          <div class="editor-wrap"><textarea id="a-binfo" aria-label="Backup information"></textarea></div>
-          <p class="gfoot" id="binfo-msg">Shown in the Backup Information panel under Backups and Windows 10.</p>
+          <div class="editor-wrap"><textarea id="a-binfo" class="rte" data-h="380" aria-label="Backup information"></textarea></div>
+          <p class="gfoot">Shown in the Backup Information panel under Backups and Windows 10.</p>
         </div>
 
         <!-- Windows 10 -->
@@ -734,6 +735,11 @@ textarea::placeholder{color:var(--dim)}
     spring(key, clamp(value), p => { fill.style.width = p + "%"; }, { damping: 1, response: 1.1 });
   }
   const notesHtml = (list, empty) => list.length ? list.map(n => `<li>${esc(n)}</li>`).join("") : `<li class="empty">${empty}</li>`;
+  /* Rich text fields hold HTML; older saves hold plain lines (string or array). Both render. */
+  const isHtml = v => typeof v === "string" && /<[a-z][\s\S]*>/i.test(v);
+  const clean = h => window.DOMPurify ? DOMPurify.sanitize(h) : esc(h.replace(/<[^>]*>/g, " "));
+  const richOf = v => isHtml(v) ? v : listOf(v).map(l => `<p>${esc(l)}</p>`).join("");
+  const notesBlock = (v, empty) => isHtml(v) ? `<li class="rich">${clean(v)}</li>` : notesHtml(listOf(v), empty);
 
   /* ---------- Board ---------- */
   function render(){
@@ -764,7 +770,7 @@ textarea::placeholder{color:var(--dim)}
     number("j-pending", $("#j-pending"), pending);
     number("j-running", $("#j-running"), running);
     number("j-daytime", $("#j-daytime"), daytime);
-    $("#p-notes").innerHTML = notesHtml(listOf(p.notes), "No patching notes.");
+    $("#p-notes").innerHTML = notesBlock(p.notes, "No patching notes.");
 
     // Backups
     const bT = backupTone(bOverall, troubled.length);
@@ -780,11 +786,10 @@ textarea::placeholder{color:var(--dim)}
     tc.innerHTML = troubled.length
       ? `<div class="tags">${troubled.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>`
       : `<span class="none">None reported</span>`;
-    $("#b-notes").innerHTML = notesHtml(listOf(b.notes), "No backup notes.");
+    $("#b-notes").innerHTML = notesBlock(b.notes, "No backup notes.");
     // Rich text from Admin: sanitized, since data.json is editable by anyone holding a repo token
     const info = String(b.info ?? "").trim();
-    $("#b-info").innerHTML = !info ? `<p class="empty">No backup information.</p>`
-      : window.DOMPurify ? DOMPurify.sanitize(info) : esc(info.replace(/<[^>]*>/g, " "));
+    $("#b-info").innerHTML = info ? clean(info) : `<p class="empty">No backup information.</p>`;
 
     // Windows 10
     const eolDays = eolDaysOf(w.eolDate);
@@ -822,7 +827,7 @@ textarea::placeholder{color:var(--dim)}
     val("#a-pnotes", linesOf(p.notes));
     val("#a-backup", b.overall); val("#a-troubled", linesOf(b.troubledClients)); val("#a-bnotes", linesOf(b.notes));
     val("#a-binfo", b.info);
-    if (editor){ filling = true; editor.setContent(b.info ?? ""); editor.undoManager.clear(); filling = false; }
+    Object.entries(editors).forEach(([id, ed]) => { if (ed){ filling = true; ed.setContent(richOf(RTE[id]())); ed.undoManager.clear(); filling = false; } });
     val("#a-rem", w.remaining); val("#a-last", w.lastMonth); val("#a-eol", w.eolDate);
     val("#a-raw", JSON.stringify(data, null, 2));
     $$(".side-item").forEach(el => el.classList.remove("dirty"));
@@ -857,14 +862,14 @@ textarea::placeholder{color:var(--dim)}
         servers: num(v("#a-servers")),
         workstations: num(v("#a-ws")),
         jobs: { pending: num(v("#a-pending")), running: num(v("#a-running")), daytime: num(v("#a-daytime")) },
-        notes: toLines(v("#a-pnotes")),
+        notes: editors["a-pnotes"] ? editors["a-pnotes"].getContent() : toLines(v("#a-pnotes")),
         lastUpdated: v("#a-updated").trim()
       },
       backups: {
         overall: num(v("#a-backup")),
         troubledClients: troubled.length ? troubled : null,
-        notes: toLines(v("#a-bnotes")).join("\n"),
-        info: editor ? editor.getContent() : v("#a-binfo")
+        notes: editors["a-bnotes"] ? editors["a-bnotes"].getContent() : toLines(v("#a-bnotes")).join("\n"),
+        info: editors["a-binfo"] ? editors["a-binfo"].getContent() : v("#a-binfo")
       },
       windows10: { remaining: num(v("#a-rem")), lastMonth: num(v("#a-last")), eolDate: v("#a-eol") }
     };
@@ -1122,40 +1127,52 @@ textarea::placeholder{color:var(--dim)}
     syncNote("Token removed. Saves from this device stay on this device.");
   });
 
-  /* Rich text editor for Backup Information. Loaded only when the Backups pane opens, so the Board stays light. */
+  /* Rich text editors for every textarea.rte. TinyMCE loads only when a pane with one opens, so the Board stays light. */
   const TINY = "https://cdn.jsdelivr.net/npm/tinymce@7.6.0";
-  let editor = null, filling = false, editorLoading = false;
-  function markBackupDirty(){
+  const RTE = {
+    "a-pnotes": () => (data.patching || {}).notes,
+    "a-bnotes": () => (data.backups || {}).notes,
+    "a-binfo": () => (data.backups || {}).info
+  };
+  const editors = {}; // id -> editor, or null while loading
+  let filling = false, tinyLoad = null;
+  const loadTiny = () => tinyLoad ||= window.tinymce ? Promise.resolve() : new Promise((ok, no) => {
+    const s = document.createElement("script");
+    s.src = TINY + "/tinymce.min.js"; s.referrerPolicy = "origin";
+    s.onload = ok; s.onerror = () => { tinyLoad = null; s.remove(); no(); };
+    document.head.appendChild(s);
+  });
+  function markDirty(ed){
     if (filling) return;
-    $('.side-item[data-pane="backup"]').classList.add("dirty");
+    const p = ed.getElement().closest(".pane");
+    if (p) $(`.side-item[data-pane="${p.id.slice(5)}"]`).classList.add("dirty");
     setMsg("Unsaved changes. Choose Save to board to apply them.", "edit");
   }
-  function ensureEditor(){
-    if (editor || editorLoading || !unlocked) return;
-    editorLoading = true;
-    const start = () => tinymce.init({
-      selector: "#a-binfo",
+  function initEditors(paneEl){
+    if (!unlocked || !paneEl) return;
+    const els = [...paneEl.querySelectorAll("textarea.rte")].filter(t => !(t.id in editors));
+    if (!els.length) return;
+    els.forEach(t => { editors[t.id] = null; });
+    loadTiny().then(() => els.forEach(t => tinymce.init({
+      target: t,
       license_key: "gpl", base_url: TINY, suffix: ".min",
       skin: "oxide-dark", content_css: "dark",
       menubar: false, branding: false, promotion: false, statusbar: false,
-      height: 380,
+      height: Number(t.dataset.h) || 260,
       plugins: "lists advlist table link autolink",
       toolbar: "undo redo | blocks fontsize | bold italic underline strikethrough | forecolor backcolor | bullist numlist outdent indent | alignleft aligncenter alignright | table link | removeformat",
       toolbar_mode: "wrap",
       table_default_styles: { "border-collapse": "collapse" },
       content_style: "body{background:#0e111c;color:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,system-ui,'Segoe UI',sans-serif;font-size:15px;line-height:1.5}",
-      setup: ed => ed.on("input change ExecCommand", markBackupDirty),
+      setup: ed => ed.on("input change ExecCommand", () => markDirty(ed)),
       init_instance_callback: ed => {
-        editor = ed; editorLoading = false;
-        filling = true; ed.setContent((data.backups || {}).info ?? ""); ed.undoManager.clear(); filling = false;
+        editors[t.id] = ed;
+        filling = true; ed.setContent(richOf(RTE[t.id]())); ed.undoManager.clear(); filling = false;
       }
+    })), () => {
+      els.forEach(t => { delete editors[t.id]; });
+      setMsg("The formatting toolbar could not load. The boxes still take plain text.", "err");
     });
-    if (window.tinymce) return start();
-    const s = document.createElement("script");
-    s.src = TINY + "/tinymce.min.js"; s.referrerPolicy = "origin";
-    s.onload = start;
-    s.onerror = () => { editorLoading = false; $("#binfo-msg").textContent = "The formatting toolbar could not load. You can still type HTML here."; };
-    document.head.appendChild(s);
   }
 
   /* Sidebar sections */
@@ -1173,7 +1190,7 @@ textarea::placeholder{color:var(--dim)}
     });
     $$(".pane").forEach(p => { p.hidden = p.id !== "pane-" + name; });
     $(".actions").hidden = name === "password" || name === "sync";
-    if (name === "backup") ensureEditor();
+    initEditors($("#pane-" + name));
     try { localStorage.setItem("adminPane", name); } catch(e){}
   }
   $$(".side-item").forEach(b => b.addEventListener("click", () => showPane(b.dataset.pane)));
