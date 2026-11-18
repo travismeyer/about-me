@@ -204,7 +204,7 @@ h1{font-family:var(--display);font-weight:700;font-size:clamp(20px,3vw,26px);lin
 .rich .empty{color:var(--muted)}
 .editor-wrap{border-radius:14px;overflow:hidden;background:rgba(14,17,28,.78)}
 .editor-wrap textarea{display:block;width:100%;min-height:320px;border:0;background:transparent;color:var(--ink);padding:12px 14px;resize:vertical;outline:none}
-.editor-wrap .tox-tinymce,.row.stack .tox-tinymce{border:0;border-radius:14px}
+.editor-wrap .tox-tinymce{border:0;border-radius:14px}
 .notes li.rich{padding:12px 14px}
 
 /* ---------- Admin: System Settings two-pane ---------- */
@@ -485,11 +485,11 @@ textarea::placeholder{color:var(--dim)}
               <div class="list">
                 <div class="row"><label for="a-updated">Shown on the Board</label><span class="field"><input id="a-updated" class="w-text" type="text"><button class="mini" type="button" id="btn-now">Now</button></span></div>
               </div>
-              <div class="gtitle">Notes</div>
-              <div class="list"><div class="row stack"><textarea id="a-pnotes" class="rte" data-h="260" aria-label="Patching notes"></textarea></div></div>
-              <p class="gfoot">Shown under the Patching panel.</p>
             </div>
           </div>
+          <div class="gtitle">Notes</div>
+          <div class="editor-wrap"><textarea id="a-pnotes" class="rte" data-h="320" aria-label="Patching notes"></textarea></div>
+          <p class="gfoot">Shown under the Patching panel.</p>
         </div>
 
         <!-- Backups -->
@@ -501,17 +501,18 @@ textarea::placeholder{color:var(--dim)}
               <div class="list">
                 <div class="row"><label for="a-backup">Overall</label><span class="field"><input id="a-backup" type="number" step="any" inputmode="decimal"><span class="unit">%</span></span></div>
               </div>
-              <div class="gtitle">Notes</div>
-              <div class="list"><div class="row stack"><textarea id="a-bnotes" class="rte" data-h="260" aria-label="Backup notes"></textarea></div></div>
             </div>
             <div class="col fill">
               <div class="gtitle">Troubled clients</div>
-              <div class="list"><div class="row stack"><textarea id="a-troubled" aria-label="Troubled clients" placeholder="One client per line" style="min-height:220px"></textarea></div></div>
+              <div class="list"><div class="row stack"><textarea id="a-troubled" aria-label="Troubled clients" placeholder="One client per line" style="min-height:120px"></textarea></div></div>
               <p class="gfoot" id="b-count">One client per line. Leave blank for none.</p>
             </div>
           </div>
+          <div class="gtitle">Notes</div>
+          <div class="editor-wrap"><textarea id="a-bnotes" class="rte" data-h="320" aria-label="Backup notes"></textarea></div>
+          <p class="gfoot">Shown under the Backups panel.</p>
           <div class="gtitle">Backup Information</div>
-          <div class="editor-wrap"><textarea id="a-binfo" class="rte" data-h="380" aria-label="Backup information"></textarea></div>
+          <div class="editor-wrap"><textarea id="a-binfo" class="rte" data-h="460" aria-label="Backup information"></textarea></div>
           <p class="gfoot">Shown in the Backup Information panel under Backups and Windows 10.</p>
         </div>
 
