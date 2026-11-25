@@ -212,6 +212,33 @@ if(!reduce&&matchMedia('(hover:hover) and (pointer:fine)').matches){const rt=doc
  addEventListener('pointermove',e=>{tx=e.clientX/innerWidth-.5;ty=e.clientY/innerHeight-.5},{passive:true});
  (function pl(){cx+=(tx-cx)*.06;cy+=(ty-cy)*.06;rt.style.setProperty('--px',cx.toFixed(4));rt.style.setProperty('--py',cy.toFixed(4));requestAnimationFrame(pl)})()}
 
+/* rack activity: a random unit lights up and flashes every 5–10 s */
+{const cv=document.querySelector('.art .blink');if(cv&&!reduce){const g=cv.getContext('2d');let S=0,vis=true,last=-1;
+ new IntersectionObserver(es=>{vis=es[0].isIntersecting}).observe(cv);
+ const rs=()=>{const d=Math.min(devicePixelRatio||1,2);S=cv.clientWidth;cv.width=cv.height=S*d;g.setTransform(d,0,0,d,0,0)};new ResizeObserver(rs).observe(cv);
+ const K=.55,X0=346,X1=500,U=[];for(let i=0;i<9;i++)U.push([228+i*21,19]);U.push([500,28],[530,28],[562,40],[612,58],[674,58]);
+ const COL=['255,46,70','255,46,70','61,255,120','61,255,120','255,214,51','255,138,30','255,60,200'];
+ const rnd=(a,b)=>a+Math.random()*(b-a);
+ const SX0=516,SX1=688;function side(y,h,s){const yf=y+K*(X1-X0);g.beginPath();g.moveTo(SX0*s,yf*s);g.lineTo(SX1*s,(yf-K*(SX1-SX0))*s);g.lineTo(SX1*s,(yf-K*(SX1-SX0)+h)*s);g.lineTo(SX0*s,(yf+h)*s);g.closePath()}
+ function poly(y,h,s){g.beginPath();g.moveTo(X0*s,y*s);g.lineTo(X1*s,(y+K*(X1-X0))*s);g.lineTo(X1*s,(y+h+K*(X1-X0))*s);g.lineTo(X0*s,(y+h)*s);g.closePath()}
+ function flash(ui,col){const[y,h]=U[ui],seq=[];let t=0;const n=Math.round(rnd(2,6));
+  for(let i=0;i<n;i++){const on=rnd(90,240),off=rnd(70,200);seq.push([t,t+on,rnd(.55,1)]);t+=on+off}
+  const t0=performance.now(),end=t+rnd(150,400);
+  (function fr(now){const e=now-t0;g.clearRect(0,0,S,S);const s=S/1024;
+   const cur=seq.find(q=>e>=q[0]&&e<q[1]);
+   if(cur){const k=cur[2]*(1-.35*((e-cur[0])/(cur[1]-cur[0])));
+    g.save();g.globalCompositeOperation='lighter';g.shadowColor=`rgba(${col},1)`;g.shadowBlur=20;
+    poly(y,h,s);g.fillStyle=`rgba(${col},${.62*k})`;g.fill();g.lineWidth=1.6;g.strokeStyle=`rgba(${col},${k})`;g.stroke();
+    side(y,h,s);g.fillStyle=`rgba(${col},${.42*k})`;g.fill();g.lineWidth=1.3;g.strokeStyle=`rgba(${col},${.85*k})`;g.stroke();
+    g.shadowBlur=10;g.strokeStyle=`rgba(255,255,255,${.7*k})`;g.lineWidth=1;g.beginPath();g.moveTo(X1*s,(y+K*(X1-X0))*s);g.lineTo(X1*s,(y+h+K*(X1-X0))*s);g.stroke();
+    const lx=(X0+10)*s,ly=(y+h/2+K*10)*s;g.fillStyle=`rgba(255,255,255,${k})`;g.beginPath();g.arc(lx,ly,2.2*Math.max(1,s*1.2),0,6.2832);g.fill();g.restore()}
+   if(e<end)requestAnimationFrame(fr);else g.clearRect(0,0,S,S)})(t0)}
+ function next(){setTimeout(()=>{if(vis&&!document.hidden&&S){let ui;do{ui=Math.floor(Math.random()*U.length)}while(ui===last);last=ui;
+   flash(ui,COL[Math.floor(Math.random()*COL.length)]);
+   if(Math.random()<.22){let u2;do{u2=Math.floor(Math.random()*U.length)}while(u2===ui);setTimeout(()=>flash(u2,COL[Math.floor(Math.random()*COL.length)]),rnd(450,1600))}}
+  next()},rnd(5000,10000)+(Math.random()<.15?rnd(0,2500):0))}
+ setTimeout(next,rnd(1500,4000))}}
+
 /* boot */
 let booted=false,bdone=false;
 const OPEN=[...PAN];
